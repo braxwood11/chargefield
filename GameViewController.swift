@@ -75,7 +75,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         setupControlButtons()
         
         // Create instructions
-        setupInstructions()
+    //    setupInstructions()
         
         // Set constraints
         NSLayoutConstraint.activate([
@@ -126,12 +126,13 @@ class GameViewController: UIViewController, GameStateDelegate {
             hintsButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
             hintsButton.widthAnchor.constraint(equalToConstant: 80),
             hintsButton.heightAnchor.constraint(equalToConstant: 40),
-            
+            /*
             // Instructions
             instructionLabel.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 20),
             instructionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             instructionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             instructionLabel.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20)
+             */
         ])
     }
     
@@ -159,47 +160,16 @@ class GameViewController: UIViewController, GameStateDelegate {
     }
     
     private func setupGrid() {
-        // Create container for the grid
-        gridView = UIView(frame: .zero)
-        gridView.backgroundColor = UIColor.white.withAlphaComponent(0.5)
-        gridView.layer.cornerRadius = 8
-        gridView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(gridView)
-        
-        // Calculate cell size based on grid size
-        let gridSize = viewModel.gameState.grid.count
-        let cellSize = 300 / CGFloat(gridSize) - 4 // 300px grid width with 4px spacing
-        
-        // Create cell views
-        for row in 0..<gridSize {
-            var rowViews: [CellView] = []
+            // Create container for the grid
+            gridView = UIView(frame: .zero)
+            gridView.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+            gridView.layer.cornerRadius = 8
+            gridView.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(gridView)
             
-            for col in 0..<gridSize {
-                let cellView = CellView(frame: .zero)
-                cellView.cell = viewModel.gameState.grid[row][col]
-                cellView.showHints = viewModel.gameState.showHints
-                cellView.selectedMagnetType = viewModel.gameState.selectedMagnetType
-                
-                // Position the cell
-                let x = CGFloat(col) * (cellSize + 4) + 2
-                let y = CGFloat(row) * (cellSize + 4) + 2
-                cellView.frame = CGRect(x: x, y: y, width: cellSize, height: cellSize)
-                
-                // Add tap gesture
-                let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cellTapped(_:)))
-                cellView.addGestureRecognizer(tapGesture)
-                cellView.isUserInteractionEnabled = true
-                
-                // Store row and column as tag (row * 100 + col)
-                cellView.tag = row * 100 + col
-                
-                gridView.addSubview(cellView)
-                rowViews.append(cellView)
-            }
-            
-            cellViews.append(rowViews)
+            // Create the cells
+            recreateGridCells()
         }
-    }
     
     private func setupControlButtons() {
             // Reset button
@@ -250,7 +220,7 @@ class GameViewController: UIViewController, GameStateDelegate {
                 newPuzzleButton.heightAnchor.constraint(equalToConstant: 40)
             ])
         }
-    
+    /*
     private func setupInstructions() {
         instructionLabel = UILabel()
         instructionLabel.text = """
@@ -270,6 +240,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         instructionLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(instructionLabel)
     }
+     */
     
     // MARK: - Action Handlers
     
@@ -338,7 +309,7 @@ class GameViewController: UIViewController, GameStateDelegate {
             present(alertController, animated: true)
         }
         
-        private func loadNewPuzzle(difficulty: String) {
+    private func loadNewPuzzle(difficulty: String) {
             // Generate a new random puzzle with the selected difficulty
             let puzzle = PuzzleDefinition.generateRandomPuzzle(difficulty: difficulty)
             
@@ -354,11 +325,47 @@ class GameViewController: UIViewController, GameStateDelegate {
             // Clear cell views array
             cellViews.removeAll()
             
-            // Create new grid
-            setupGrid()
+            // Create new grid cells (the grid container itself remains in the same position)
+            recreateGridCells()
             
             // Update UI
             updateUI()
+        }
+        
+        // Create or recreate just the cells within the grid
+        private func recreateGridCells() {
+            let gridSize = viewModel.gameState.grid.count
+            let cellSize = 300 / CGFloat(gridSize) - 4 // 300px grid width with 4px spacing
+            
+            // Create cell views
+            for row in 0..<gridSize {
+                var rowViews: [CellView] = []
+                
+                for col in 0..<gridSize {
+                    let cellView = CellView(frame: .zero)
+                    cellView.cell = viewModel.gameState.grid[row][col]
+                    cellView.showHints = viewModel.gameState.showHints
+                    cellView.selectedMagnetType = viewModel.gameState.selectedMagnetType
+                    
+                    // Position the cell
+                    let x = CGFloat(col) * (cellSize + 4) + 2
+                    let y = CGFloat(row) * (cellSize + 4) + 2
+                    cellView.frame = CGRect(x: x, y: y, width: cellSize, height: cellSize)
+                    
+                    // Add tap gesture
+                    let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cellTapped(_:)))
+                    cellView.addGestureRecognizer(tapGesture)
+                    cellView.isUserInteractionEnabled = true
+                    
+                    // Store row and column as tag (row * 100 + col)
+                    cellView.tag = row * 100 + col
+                    
+                    gridView.addSubview(cellView)
+                    rowViews.append(cellView)
+                }
+                
+                cellViews.append(rowViews)
+            }
         }
     
     // Clear all cell selections
