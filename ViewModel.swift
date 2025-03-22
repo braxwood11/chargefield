@@ -19,6 +19,10 @@ class GameViewModel {
     private let gridSize: Int
     weak var delegate: GameStateDelegate?
     
+    // Store the total magnets available for this puzzle
+    private let totalPositiveMagnets: Int
+    private let totalNegativeMagnets: Int
+    
     init(puzzle: PuzzleDefinition) {
         self.gridSize = puzzle.gridSize
         self.gameState = PuzzleState(
@@ -29,6 +33,11 @@ class GameViewModel {
             positiveMagnets: puzzle.positiveMagnets,
             negativeMagnets: puzzle.negativeMagnets
         )
+        
+        // Store the total magnets for this puzzle
+        self.totalPositiveMagnets = puzzle.positiveMagnets
+        self.totalNegativeMagnets = puzzle.negativeMagnets
+        
         // Calculate initial field values
         updateFieldValues()
     }
@@ -190,23 +199,23 @@ class GameViewModel {
         }
     
     // Reset the puzzle
-    func resetPuzzle() {
-        // Reset magnets
-        for row in 0..<gridSize {
-            for col in 0..<gridSize {
-                gameState.grid[row][col].magnetValue = 0
-                gameState.grid[row][col].isSelected = false
+        func resetPuzzle() {
+            // Reset magnets
+            for row in 0..<gridSize {
+                for col in 0..<gridSize {
+                    gameState.grid[row][col].magnetValue = 0
+                    gameState.grid[row][col].isSelected = false
+                }
             }
+            
+            // Reset available magnets to their original values
+            gameState.availableMagnets = (positive: totalPositiveMagnets, negative: totalNegativeMagnets)
+            gameState.puzzleSolved = false
+            gameState.showSolution = false
+            
+            // Update field values
+            updateFieldValues()
         }
-        
-        // Reset available magnets
-        gameState.availableMagnets = (positive: 3, negative: 3)
-        gameState.puzzleSolved = false
-        gameState.showSolution = false
-        
-        // Update field values
-        updateFieldValues()
-    }
     
     // Show solution
     func toggleSolution() {

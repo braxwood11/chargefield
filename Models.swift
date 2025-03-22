@@ -114,8 +114,13 @@ struct PuzzleDefinition {
         )
     }
     
-    // TODO: Add a function to generate random puzzles in the future
-    static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium") -> PuzzleDefinition {
-            return PuzzleGenerator.generateRandomPuzzle(gridSize: gridSize, difficulty: difficulty)
+    // Generate a random puzzle
+        static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
+            return PuzzleGenerator.generateRandomPuzzle(
+                gridSize: gridSize,
+                difficulty: difficulty,
+                positiveMagnets: positiveMagnets,
+                negativeMagnets: negativeMagnets
+            )
         }
 }

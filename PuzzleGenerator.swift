@@ -14,16 +14,29 @@ class PuzzleGenerator {
     // Generate a random puzzle with the specified difficulty
     static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
         
-        // Determine target cell count based on difficulty
-        let targetCellRange: ClosedRange<Int>
-        switch difficulty.lowercased() {
-        case "easy":
-            targetCellRange = 12...15
-        case "hard":
-            targetCellRange = 8...10
-        default: // medium
-            targetCellRange = 9...12
-        }
+        // Determine target cell count based on difficulty and grid size
+                let targetCellRange: ClosedRange<Int>
+                if gridSize == 4 {
+                    // For 4x4 grid
+                    switch difficulty.lowercased() {
+                    case "easy":
+                        targetCellRange = 8...10  // Less cells for 4x4 easy
+                    case "hard":
+                        targetCellRange = 6...8   // Harder with fewer clues
+                    default: // medium
+                        targetCellRange = 7...9   // Medium difficulty
+                    }
+                } else {
+                    // For 5x5 grid (original values)
+                    switch difficulty.lowercased() {
+                    case "easy":
+                        targetCellRange = 12...15
+                    case "hard":
+                        targetCellRange = 8...10
+                    default: // medium
+                        targetCellRange = 9...12
+                    }
+                }
         
         // Step 1: Generate a random solution (magnet placements)
         var solution = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)

@@ -310,8 +310,20 @@ class GameViewController: UIViewController, GameStateDelegate {
         }
         
     private func loadNewPuzzle(difficulty: String) {
-            // Generate a new random puzzle with the selected difficulty
-            let puzzle = PuzzleDefinition.generateRandomPuzzle(difficulty: difficulty)
+            // Determine grid size based on difficulty
+            let gridSize = difficulty.lowercased() == "easy" ? 4 : 5
+            
+            // Determine magnet counts based on difficulty
+            let positiveMagnets = difficulty.lowercased() == "easy" ? 2 : 3
+            let negativeMagnets = difficulty.lowercased() == "easy" ? 2 : 3
+            
+            // Generate a new random puzzle with the selected difficulty and grid size
+            let puzzle = PuzzleDefinition.generateRandomPuzzle(
+                gridSize: gridSize,
+                difficulty: difficulty,
+                positiveMagnets: positiveMagnets,
+                negativeMagnets: negativeMagnets
+            )
             
             // Create a new view model with the puzzle
             viewModel = GameViewModel(puzzle: puzzle)
@@ -492,6 +504,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         generator.notificationOccurred(.success)
     }
 }
+
 
 // MARK: - Extension for any additional functionality
 
