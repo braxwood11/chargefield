@@ -13,14 +13,33 @@ import Foundation
 struct MagnetCell {
     // -1 for negative, 0 for none, 1 for positive
     var magnetValue: Int = 0
-    // -99 means no target, other values are the target field value
-    var targetValue: Int = -99
+    // Initial charge to be neutralized (non-zero means this is a target cell)
+    var initialCharge: Int = 0
     // Current calculated field value
     var currentFieldValue: Int = 0
     // Whether this cell can have a magnet placed on it
     var placeable: Bool = true
     // First tap selects the cell, second tap confirms placement
     var isSelected: Bool = false
+    
+    // Computed property to determine if the cell is neutralized
+    var isNeutralized: Bool {
+        return initialCharge != 0 && currentFieldValue == 0
+    }
+    
+    // Computed property to determine if values overshot (went past zero)
+    var isOvershot: Bool {
+        // Only applies to target cells (with an initial charge)
+        guard initialCharge != 0 else { return false }
+        
+        // Check if signs are different (crossed over zero)
+        return (initialCharge > 0 && currentFieldValue < 0) || (initialCharge < 0 && currentFieldValue > 0)
+    }
+    
+    // Computed property to get remaining charge to be neutralized
+    var remainingCharge: Int {
+        return initialCharge != 0 ? currentFieldValue : 0
+    }
 }
 
 // Represents the game state
@@ -41,15 +60,16 @@ struct PuzzleState {
     var solution: [[Int]]
     
     // Initialize a new puzzle with the given parameters
-    init(gridSize: Int, targetValues: [[Int]], solution: [[Int]], placeableGrid: [[Bool]]? = nil, positiveMagnets: Int = 3, negativeMagnets: Int = 3) {
+    init(gridSize: Int, initialCharges: [[Int]], solution: [[Int]], placeableGrid: [[Bool]]? = nil, positiveMagnets: Int = 3, negativeMagnets: Int = 3) {
         // Initialize grid
         var initialGrid = Array(repeating: Array(repeating: MagnetCell(), count: gridSize), count: gridSize)
         
-        // Set target values
+        // Set initial charges
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                if row < targetValues.count && col < targetValues[row].count {
-                    initialGrid[row][col].targetValue = targetValues[row][col]
+                if row < initialCharges.count && col < initialCharges[row].count {
+                    initialGrid[row][col].initialCharge = initialCharges[row][col]
+                    initialGrid[row][col].currentFieldValue = initialCharges[row][col]
                 }
                 
                 // Set placeable status if provided
@@ -73,7 +93,7 @@ struct PuzzleState {
 
 struct PuzzleDefinition {
     let gridSize: Int
-    let targetValues: [[Int]]
+    let initialCharges: [[Int]]
     let solution: [[Int]]
     let placeableGrid: [[Bool]]?
     let positiveMagnets: Int
@@ -83,12 +103,12 @@ struct PuzzleDefinition {
     static func zPatternPuzzle() -> PuzzleDefinition {
         let gridSize = 5
         
-        // Define the target values for each cell (-99 means no target)
-        let targetValues = [
+        // Define the initial charges for each cell (0 means not a target cell)
+        let initialCharges = [
             [-4, -2, 1, 2, 2],
-            [-99, -4, -99, 2, -99],
-            [-99, -99, 4, -99, -99],
-            [-99, 0, -99, -99, -99],
+            [0, -4, 0, 2, 0],
+            [0, 0, 4, 0, 0],
+            [0, 0, 0, 0, 0],
             [1, 2, 4, 2, -1]
         ]
         
@@ -106,7 +126,7 @@ struct PuzzleDefinition {
         
         return PuzzleDefinition(
             gridSize: gridSize,
-            targetValues: targetValues,
+            initialCharges: initialCharges,
             solution: solution,
             placeableGrid: placeableGrid,
             positiveMagnets: 3,
@@ -115,12 +135,12 @@ struct PuzzleDefinition {
     }
     
     // Generate a random puzzle
-        static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
-            return PuzzleGenerator.generateRandomPuzzle(
-                gridSize: gridSize,
-                difficulty: difficulty,
-                positiveMagnets: positiveMagnets,
-                negativeMagnets: negativeMagnets
-            )
-        }
+    static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
+        return PuzzleGenerator.generateRandomPuzzle(
+            gridSize: gridSize,
+            difficulty: difficulty,
+            positiveMagnets: positiveMagnets,
+            negativeMagnets: negativeMagnets
+        )
+    }
 }

@@ -12,10 +12,11 @@ import UIKit
 // A view for a single cell in the grid
 class CellView: UIView {
     // UI Components
-    private let targetLabel = UILabel()
-    private let currentValueLabel = UILabel()
+    private let chargeLabel = UILabel()
+    private let chargeBackground = UIView()
     private let magnetView = UIView()
     private let magnetSymbol = UILabel()
+    private let neutralizedIndicator = UIView()
     
     // Progress indicator component
     private let fillBarView = UIView()
@@ -57,54 +58,81 @@ class CellView: UIView {
         layer.borderColor = UIColor.lightGray.cgColor
         backgroundColor = .white
         
-        // Target value label (top-center)
-        targetLabel.font = UIFont.boldSystemFont(ofSize: 12)
-        targetLabel.textAlignment = .center
-        addSubview(targetLabel)
+        // Fill bar view (for gradient fill)
+        fillBarView.backgroundColor = .clear
+        fillBarView.isUserInteractionEnabled = false
+        addSubview(fillBarView)
         
-        // Current value label (bottom-right)
-        currentValueLabel.font = UIFont.systemFont(ofSize: 10)
-        currentValueLabel.textAlignment = .right
-        addSubview(currentValueLabel)
+        // Neutralized indicator (checkmark or visual cue for neutralized cells)
+        neutralizedIndicator.backgroundColor = UIColor.green.withAlphaComponent(0.2)
+        neutralizedIndicator.layer.cornerRadius = 3
+        neutralizedIndicator.isHidden = true
+        addSubview(neutralizedIndicator)
+        
+        // Charge label background for better visibility
+        chargeBackground.backgroundColor = UIColor.white.withAlphaComponent(0.7)
+        chargeBackground.layer.cornerRadius = 8
+        addSubview(chargeBackground)
+        
+        // Charge value label (will be positioned in layoutSubviews)
+        // Use a variable font size based on cell size
+        chargeLabel.font = UIFont.boldSystemFont(ofSize: 12) // Will adjust size in layoutSubviews
+        chargeLabel.textAlignment = .center
+        addSubview(chargeLabel)
         
         // Magnet view (center)
-        magnetView.layer.cornerRadius = 15 // Half of width/height for circle
+        magnetView.layer.cornerRadius = 15 // Will adjust in layoutSubviews
         magnetView.isHidden = true
         addSubview(magnetView)
         
         // Magnet symbol (+ or -)
         magnetSymbol.textColor = .white
         magnetSymbol.textAlignment = .center
-        magnetSymbol.font = UIFont.boldSystemFont(ofSize: 16)
+        magnetSymbol.font = UIFont.boldSystemFont(ofSize: 16) // Will adjust size in layoutSubviews
         magnetView.addSubview(magnetSymbol)
-        
-        // Fill bar view (for gradient fill)
-        fillBarView.backgroundColor = .clear
-        fillBarView.isUserInteractionEnabled = false
-        addSubview(fillBarView)
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        // Position fill bar at bottom or side of cell - now treating it as a vertical bar
+        // Position fill bar at bottom of cell
         fillBarView.frame = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height)
         
-        // Position elements on top of the fill bar
-        // Position target label in top-center
-        targetLabel.frame = CGRect(x: (bounds.width - 40) / 2, y: 5, width: 40, height: 20)
-        targetLabel.textAlignment = .center
+        // Position neutralized indicator as a thin border
+        neutralizedIndicator.frame = bounds
         
-        // Position current value label in bottom-right
-        currentValueLabel.frame = CGRect(x: bounds.width - 25, y: bounds.height - 25, width: 20, height: 20)
+        // Adjust size based on cell size - make them smaller for 5x5 grid
+        let isSmallCell = bounds.width < 60 // For 5x5 grid
         
-        // Position magnet view in center
-        magnetView.frame = CGRect(x: (bounds.width - 30) / 2, y: (bounds.height - 30) / 2, width: 30, height: 30)
+        // Position magnet view in center - make it smaller for 5x5 grid
+        let magnetSize: CGFloat = isSmallCell ? 24 : 30
+        magnetView.frame = CGRect(
+            x: (bounds.width - magnetSize) / 2,
+            y: (bounds.height - magnetSize) / 2,
+            width: magnetSize,
+            height: magnetSize
+        )
+        magnetView.layer.cornerRadius = magnetSize / 2
         magnetSymbol.frame = magnetView.bounds
         
+        // Position charge background for better visibility - move to top left corner for small cells
+        let chargeSize: CGFloat = isSmallCell ? 20 : 24
+        let chargePositionX: CGFloat = isSmallCell ? 2 : bounds.width - chargeSize - 2
+        let chargePositionY: CGFloat = 2
+        
+        chargeBackground.frame = CGRect(
+            x: chargePositionX,
+            y: chargePositionY,
+            width: chargeSize,
+            height: chargeSize
+        )
+        
+        // Position charge label in same position
+        chargeLabel.frame = chargeBackground.frame
+        
         // Ensure proper z-order
-        bringSubviewToFront(targetLabel)
-        bringSubviewToFront(currentValueLabel)
+        bringSubviewToFront(chargeBackground)
+        bringSubviewToFront(chargeLabel)
         bringSubviewToFront(magnetView)
     }
     
@@ -112,28 +140,32 @@ class CellView: UIView {
     func updateAppearance() {
         guard let cell = cell else { return }
         
-        // Set target value if it exists
-        if cell.targetValue != -99 {
-            targetLabel.text = "\(cell.targetValue)"
-            targetLabel.textColor = cell.targetValue < 0 ? .blue : .red
-            targetLabel.isHidden = false
-            
-            // Update charge indicators - this will set background
-            updateChargeIndicators(target: cell.targetValue, current: cell.currentFieldValue)
+        // Adjust font sizes based on cell size
+        let isSmallCell = bounds.width < 60 // For 5x5 grid
+        chargeLabel.font = UIFont.boldSystemFont(ofSize: isSmallCell ? 10 : 14)
+        magnetSymbol.font = UIFont.boldSystemFont(ofSize: isSmallCell ? 14 : 16)
+        
+        // Update charge label based on current field value
+        chargeLabel.text = "\(cell.currentFieldValue)"
+        
+        // Set charge label color based on charge sign
+        if cell.currentFieldValue < 0 {
+            chargeLabel.textColor = .blue
+        } else if cell.currentFieldValue > 0 {
+            chargeLabel.textColor = .red
         } else {
-            targetLabel.isHidden = true
-            fillBarView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
-            backgroundColor = .white
+            // Zero value - black text
+            chargeLabel.textColor = .black
         }
+        
+        // Show charge label and background only for target cells or when hints are on
+        let isTargetCell = cell.initialCharge != 0
+        chargeLabel.isHidden = !isTargetCell && !showHints
+        chargeBackground.isHidden = !isTargetCell && !showHints
         
         // Update border for selection
         layer.borderWidth = cell.isSelected ? 2 : 1
         layer.borderColor = cell.isSelected ? UIColor.black.cgColor : UIColor.lightGray.cgColor
-        
-        // Set current field value if hints are on
-        currentValueLabel.text = "\(cell.currentFieldValue)"
-        currentValueLabel.textColor = cell.currentFieldValue < 0 ? .blue : cell.currentFieldValue > 0 ? .red : .gray
-        currentValueLabel.isHidden = !showHints
         
         // Show magnet if present
         if cell.magnetValue != 0 {
@@ -144,115 +176,217 @@ class CellView: UIView {
             magnetView.isHidden = true
         }
         
+        // Update neutralization status
+        updateNeutralizationStatus()
+        
         // Show selection overlay if selected
         updateSelectionAppearance()
     }
     
-    // Update charge proximity indicators
-    private func updateChargeIndicators(target: Int, current: Int) {
+    // Update the neutralization status and visualization
+    private func updateNeutralizationStatus() {
+        guard let cell = cell else { return }
+        
         // Clear existing layers
         fillBarView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         
-        // Calculate difference and progress
-        let difference = current - target
-        let matched = (difference == 0)
+        // Only process cells with initial charge (target cells)
+        if cell.initialCharge == 0 {
+            neutralizedIndicator.isHidden = true
+            backgroundColor = .white
+            return
+        }
         
-        // Determine base color based on target sign
-        let baseColor: UIColor = target < 0 ? .blue : .red
+        // Handle neutralized cells
+        if cell.isNeutralized {
+            neutralizedIndicator.isHidden = false
+            backgroundColor = UIColor.green.withAlphaComponent(0.15)
+            
+            // Add checkmark or other completion indicator
+            let checkLayer = CAShapeLayer()
+            checkLayer.path = UIBezierPath(roundedRect: CGRect(x: 5, y: 5, width: bounds.width - 10, height: bounds.height - 10), cornerRadius: 3).cgPath
+            checkLayer.strokeColor = UIColor.green.cgColor
+            checkLayer.fillColor = UIColor.clear.cgColor
+            checkLayer.lineWidth = 2
+            fillBarView.layer.addSublayer(checkLayer)
+            
+            return
+        }
         
-        // Draw the fill bar based on the new color scheme
-        drawNewFillBar(target: target, current: current, baseColor: baseColor, matched: matched)
+        // Hide neutralized indicator for non-neutralized cells
+        neutralizedIndicator.isHidden = true
+        
+        // Handle overshooting
+        if cell.isOvershot {
+            // Cell went past zero (wrong direction)
+            displayOvershootState()
+            return
+        }
+        
+        // Regular progress toward neutralization
+        displayNeutralizationProgress()
     }
     
-    // Draw the fill bar with the new color scheme
-    private func drawNewFillBar(target: Int, current: Int, baseColor: UIColor, matched: Bool) {
-        // Calculate the percentage filled based on proximity to target
-        let maxValue = abs(target) // Scale based on target magnitude
-        var fillPercentage: CGFloat = 0.0
-        let greenColor = UIColor(red: 0.0, green: 0.8, blue: 0.3, alpha: 0.6) // Reduced opacity
+    // Display the overshooting state (past zero)
+    private func displayOvershootState() {
+        guard let cell = cell else { return }
         
-        if matched {
-            // Exactly matched - full green bar with reduced opacity
-            let fillLayer = CALayer()
-            fillLayer.frame = fillBarView.bounds
-            fillLayer.backgroundColor = greenColor.withAlphaComponent(0.25).cgColor
-            fillBarView.layer.addSublayer(fillLayer)
+        // Background with warning color
+        backgroundColor = UIColor.orange.withAlphaComponent(0.15)
+        
+        // Create striped pattern to indicate overshooting
+        let stripeLayer = CAShapeLayer()
+        
+        // Create a clip path to constrain stripes within the cell bounds
+        let clipPath = UIBezierPath(rect: bounds)
+        stripeLayer.fillColor = nil
+        
+        // Create the diagonal stripes path
+        let path = UIBezierPath()
+        let stripeWidth: CGFloat = 5.0
+        let spacing: CGFloat = 10.0
+        
+        // Draw diagonal lines that start from left of the cell and finish at the bottom
+        for x in stride(from: -bounds.height, to: bounds.width, by: spacing) {
+            let startPoint = CGPoint(x: x, y: bounds.height)
+            let endPoint = CGPoint(x: min(x + bounds.height, bounds.width), y: max(0, bounds.height - (bounds.width - x)))
             
-            // Update background for a matched cell
-            backgroundColor = UIColor(red: 0.0, green: 0.8, blue: 0.3, alpha: 0.15) // Lighter green
-            return
+            path.move(to: startPoint)
+            path.addLine(to: endPoint)
         }
         
-        // Different color treatment based on position relative to target
-        let overShooting = (target < 0 && current < target) || (target > 0 && current > target)
-        let wrongDirection = (target < 0 && current > 0) || (target > 0 && current < 0)
-        
-        if wrongDirection {
-            // Wrong direction completely (e.g., positive when should be negative)
-            // Fill with opposite color but with reduced opacity
-            let oppositeColor = target < 0 ? UIColor.red : UIColor.blue
+        // Add stripes coming from the top
+        for y in stride(from: 0, through: bounds.height, by: spacing) {
+            let startPoint = CGPoint(x: 0, y: y)
+            let endPoint = CGPoint(x: min(bounds.width, y), y: max(0, y - bounds.width))
             
-            let fillLayer = CALayer()
-            fillLayer.frame = fillBarView.bounds
-            fillLayer.backgroundColor = oppositeColor.withAlphaComponent(0.2).cgColor
-            fillBarView.layer.addSublayer(fillLayer)
-            
-            // Set background to base color with very low transparency
-            backgroundColor = baseColor.withAlphaComponent(0.05)
-            return
+            path.move(to: startPoint)
+            path.addLine(to: endPoint)
         }
         
-        if overShooting {
-            // Beyond target (overshooting) - reduced opacity
-            let warningColor = UIColor.orange
-            
-            let fillLayer = CALayer()
-            fillLayer.frame = fillBarView.bounds
-            fillLayer.backgroundColor = warningColor.withAlphaComponent(0.2).cgColor
-            fillBarView.layer.addSublayer(fillLayer)
-            
-            // Set background to orange with very low transparency
-            backgroundColor = warningColor.withAlphaComponent(0.1)
-            return
-        }
+        // Apply the paths to the shape layer
+        stripeLayer.path = path.cgPath
+        stripeLayer.lineWidth = stripeWidth
+        stripeLayer.strokeColor = UIColor.orange.withAlphaComponent(0.3).cgColor
+        stripeLayer.masksToBounds = true
+        stripeLayer.frame = bounds
         
-        // Regular case - approaching target
-        // Calculate how close we are to target (0 to 1)
-        if target < 0 {
-            // For negative targets
-            fillPercentage = min(1.0, abs(CGFloat(current) / CGFloat(target)))
+        fillBarView.layer.addSublayer(stripeLayer)
+        
+        // Add directional arrow to indicate which way to adjust
+        let arrowLayer = CAShapeLayer()
+        let arrowSize: CGFloat = 15.0
+        let arrowPath = UIBezierPath()
+        
+        // Point arrow left or right based on needed correction
+        if (cell.initialCharge > 0 && cell.currentFieldValue < 0) {
+            // Need to add more positive charge
+            arrowPath.move(to: CGPoint(x: bounds.width/2 - arrowSize, y: bounds.height/2))
+            arrowPath.addLine(to: CGPoint(x: bounds.width/2 + arrowSize, y: bounds.height/2))
+            arrowPath.addLine(to: CGPoint(x: bounds.width/2, y: bounds.height/2 - arrowSize/2))
+            arrowPath.close()
         } else {
-            // For positive targets
-            fillPercentage = min(1.0, CGFloat(current) / CGFloat(target))
+            // Need to add more negative charge
+            arrowPath.move(to: CGPoint(x: bounds.width/2 + arrowSize, y: bounds.height/2))
+            arrowPath.addLine(to: CGPoint(x: bounds.width/2 - arrowSize, y: bounds.height/2))
+            arrowPath.addLine(to: CGPoint(x: bounds.width/2, y: bounds.height/2 - arrowSize/2))
+            arrowPath.close()
         }
         
-        // Base layer (colored by target sign) with reduced opacity
+        arrowLayer.path = arrowPath.cgPath
+        arrowLayer.fillColor = UIColor.orange.withAlphaComponent(0.5).cgColor
+        arrowLayer.masksToBounds = true
+        
+        fillBarView.layer.addSublayer(arrowLayer)
+    }
+    
+    // Display progress toward neutralization
+    private func displayNeutralizationProgress() {
+        guard let cell = cell else { return }
+        
+        // Calculate progress percentage (0.0 to 1.0)
+        let initialAbsValue = abs(cell.initialCharge)
+        let currentAbsValue = abs(cell.currentFieldValue)
+        let progressPercentage = initialAbsValue > 0 ? 1.0 - (Double(currentAbsValue) / Double(initialAbsValue)) : 0.0
+        
+        // Determine base color based on original charge sign
+        let baseColor: UIColor = cell.initialCharge < 0 ? .blue : .red
+        let progressColor = UIColor.green.withAlphaComponent(0.4)
+        
+        // Base layer (colored by charge sign) with reduced opacity
         let baseLayer = CALayer()
         baseLayer.frame = fillBarView.bounds
         baseLayer.backgroundColor = baseColor.withAlphaComponent(0.15).cgColor
         fillBarView.layer.addSublayer(baseLayer)
         
-        // Green progress fill proportional to progress - with reduced opacity
-        if fillPercentage > 0 {
-            let greenLayer = CALayer()
-            greenLayer.frame = CGRect(
+        // Progress layer (green progress toward neutralization)
+        if progressPercentage > 0 {
+            let progressLayer = CALayer()
+            progressLayer.frame = CGRect(
                 x: 0,
-                y: fillBarView.bounds.height * (1 - fillPercentage),
+                y: fillBarView.bounds.height * (1 - CGFloat(progressPercentage)),
                 width: fillBarView.bounds.width,
-                height: fillBarView.bounds.height * fillPercentage
+                height: fillBarView.bounds.height * CGFloat(progressPercentage)
             )
-            greenLayer.backgroundColor = greenColor.withAlphaComponent(0.2).cgColor
-            fillBarView.layer.addSublayer(greenLayer)
+            progressLayer.backgroundColor = progressColor.cgColor
+            fillBarView.layer.addSublayer(progressLayer)
         }
         
-        // Set background color based on closeness - but much more subtle
-        if fillPercentage > 0.7 {
-            // Close to target - very light green tint
-            backgroundColor = greenColor.withAlphaComponent(0.05 + (fillPercentage - 0.7) * 0.1)
+        // Add remaining value indicator (shows how much is left to neutralize)
+        if showHints && progressPercentage < 1.0 {
+            // Calculate the remaining value needed
+            let remainingValue = cell.initialCharge > 0 ? cell.currentFieldValue : -cell.currentFieldValue
+            
+            // Create a small label to show the remaining charge
+            let remainingLayer = CATextLayer()
+            remainingLayer.string = "\(remainingValue)"
+            remainingLayer.fontSize = 10
+            remainingLayer.alignmentMode = .center
+            remainingLayer.foregroundColor = cell.initialCharge > 0 ? UIColor.red.cgColor : UIColor.blue.cgColor
+            remainingLayer.backgroundColor = UIColor.white.withAlphaComponent(0.7).cgColor
+            remainingLayer.cornerRadius = 3
+            remainingLayer.contentsScale = UIScreen.main.scale
+            
+            // Position at the bottom-left
+            remainingLayer.frame = CGRect(x: 4, y: bounds.height - 16, width: 20, height: 12)
+            
+            fillBarView.layer.addSublayer(remainingLayer)
+        }
+        
+        // Set background color based on progress
+        if progressPercentage > 0.7 {
+            // Close to neutralized - light green tint
+            backgroundColor = UIColor.green.withAlphaComponent(0.05 + (progressPercentage - 0.7) * 0.1)
         } else {
-            // Further from target - very light base color tint
+            // Further from neutralized - very light base color tint
             backgroundColor = baseColor.withAlphaComponent(0.05)
         }
+        
+        // Add pulsing animation for cells that are close to being neutralized
+        if progressPercentage > 0.8 && progressPercentage < 1.0 {
+            addPulsingAnimation()
+        }
+    }
+    
+    // Add pulsing animation for cells close to neutralization
+    private func addPulsingAnimation() {
+        let pulseLayer = CAShapeLayer()
+        pulseLayer.path = UIBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 4), cornerRadius: 3).cgPath
+        pulseLayer.strokeColor = UIColor.green.cgColor
+        pulseLayer.fillColor = UIColor.clear.cgColor
+        pulseLayer.lineWidth = 1.5
+        pulseLayer.name = "pulseLayer"
+        
+        // Create pulsing animation
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = 0.8
+        animation.toValue = 0.2
+        animation.duration = 1.0
+        animation.repeatCount = Float.infinity
+        animation.autoreverses = true
+        
+        pulseLayer.add(animation, forKey: "pulseAnimation")
+        fillBarView.layer.addSublayer(pulseLayer)
     }
     
     // Update the appearance based on selection state
@@ -288,6 +422,7 @@ class CellView: UIView {
     }
     
     // Show influence preview based on intensity
+    // Corrected showInfluence method in CellView
     func showInfluence(intensity: Int, magnetType: Int) {
         // Only show influence preview if not selected
         guard let cell = cell, !cell.isSelected else { return }
@@ -295,14 +430,17 @@ class CellView: UIView {
         // Remove existing influence layer if any
         layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
         
+        // For the cell where the magnet would be placed, show its own strength (3)
+        let displayIntensity = intensity
+        
         // Create influence layer if needed
-        if intensity > 0 {
+        if displayIntensity > 0 {
             let influenceLayer = CALayer()
             influenceLayer.frame = bounds
             influenceLayer.name = "influenceLayer"
             
-            // Set color based on magnet type and intensity (0-3) - much lower opacity
-            let alpha = CGFloat(intensity) * 0.05 + 0.05 // 0.1 for intensity 1, 0.15 for 2, 0.2 for 3
+            // Set color based on magnet type and intensity (0-3) - lower opacity
+            let alpha = CGFloat(displayIntensity) * 0.05 + 0.05
             
             if magnetType == 1 {
                 influenceLayer.backgroundColor = UIColor.red.withAlphaComponent(alpha).cgColor
@@ -315,71 +453,39 @@ class CellView: UIView {
             }
             
             layer.insertSublayer(influenceLayer, at: 0)  // Insert at bottom
+            
+            // Show numerical impact if this is a target cell or if we're showing hints
+            if cell.initialCharge != 0 || showHints {
+                // Calculate the influence value
+                let influenceValue = intensity * magnetType
+                
+                // Create a label to show the potential change
+                let impactLayer = CATextLayer()
+                let sign = influenceValue > 0 ? "+" : ""
+                impactLayer.string = "\(sign)\(influenceValue)"
+                impactLayer.fontSize = 12
+                impactLayer.alignmentMode = .center
+                impactLayer.foregroundColor = magnetType > 0 ? UIColor.red.cgColor : UIColor.blue.cgColor
+                impactLayer.backgroundColor = UIColor.white.withAlphaComponent(0.8).cgColor
+                impactLayer.cornerRadius = 4
+                impactLayer.contentsScale = UIScreen.main.scale
+                
+                // Position in the center
+                impactLayer.frame = CGRect(
+                    x: (bounds.width - 30) / 2,
+                    y: (bounds.height - 20) / 2,
+                    width: 30,
+                    height: 20
+                )
+                
+                influenceLayer.addSublayer(impactLayer)
+            }
         }
     }
     
     // Clear influence preview
     func clearInfluence() {
         layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
-    }
-}
-
-// A view for magnet selection buttons
-class MagnetButton: UIButton {
-    // Properties
-    var magnetType: Int = 0
-    var count: Int?
-    
-    // Initializers
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupButton()
-    }
-    
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupButton()
-    }
-    
-    private func setupButton() {
-        titleLabel?.font = UIFont.systemFont(ofSize: 12)
-        titleLabel?.numberOfLines = 2
-        titleLabel?.textAlignment = .center
-        layer.cornerRadius = 20
-        clipsToBounds = true
-    }
-    
-    // Configure the button for a specific magnet type
-    func configure(type: Int, count: Int? = nil, isSelected: Bool) {
-        self.magnetType = type
-        self.count = count
-        
-        // Set background color based on type
-        if type == 1 {
-            backgroundColor = .red
-            setTitle("+", for: .normal)
-            setTitleColor(.white, for: .normal)
-        } else if type == -1 {
-            backgroundColor = .blue
-            setTitle("-", for: .normal)
-            setTitleColor(.white, for: .normal)
-        } else {
-            backgroundColor = UIColor.lightGray
-            setTitle("X", for: .normal)
-            setTitleColor(.black, for: .normal)
-        }
-        
-        // Add count text if available
-        if let count = count {
-            let countText = "\(count) left"
-            setTitle("\n\(countText)", for: .normal)
-        } else if type == 0 {
-            setTitle("\nEraser", for: .normal)
-        }
-        
-        // Show selection border
-        layer.borderWidth = isSelected ? 2 : 0
-        layer.borderColor = UIColor.black.cgColor
     }
 }
 
@@ -417,5 +523,88 @@ class MessageView: UIView {
     // Public method to set the message text
     func setMessage(_ message: String) {
         messageLabel.text = message
+    }
+}
+
+// A view for magnet selection buttons with improved design
+class MagnetButton: UIButton {
+    // Properties
+    var magnetType: Int = 0
+    var count: Int?
+    
+    // UI elements
+    private let symbolLabel = UILabel()
+    private let countLabel = UILabel()
+    
+    // Initializers
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupButton()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupButton()
+    }
+    
+    private func setupButton() {
+        // Button setup
+        layer.cornerRadius = 20
+        clipsToBounds = true
+        
+        // Setup symbol label (+ or -)
+        symbolLabel.textAlignment = .center
+        symbolLabel.font = UIFont.systemFont(ofSize: 40, weight: .bold)
+        symbolLabel.textColor = .white
+        symbolLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(symbolLabel)
+        
+        // Setup count label
+        countLabel.textAlignment = .center
+        countLabel.font = UIFont.systemFont(ofSize: 14, weight: .bold)
+        countLabel.textColor = .white
+        countLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(countLabel)
+        
+        // Position labels
+        NSLayoutConstraint.activate([
+            symbolLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            symbolLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -15),
+            
+            countLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            countLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            countLabel.widthAnchor.constraint(equalToConstant: 80),
+            countLabel.heightAnchor.constraint(equalToConstant: 20)
+        ])
+    }
+    
+    // Configure the button for a specific magnet type
+    func configure(type: Int, count: Int? = nil, isSelected: Bool) {
+        self.magnetType = type
+        self.count = count
+        
+        // Set background color based on type
+        if type == 1 {
+            backgroundColor = .red
+            symbolLabel.text = "+"
+        } else if type == -1 {
+            backgroundColor = .blue
+            symbolLabel.text = "−"  // Using unicode minus sign for better appearance
+        } else {
+            backgroundColor = UIColor.lightGray
+            symbolLabel.text = "✕"  // Using unicode multiplication sign for X
+        }
+        
+        // Set count text if available
+        if let count = count {
+            countLabel.text = "\(count) left"
+            countLabel.isHidden = false
+        } else {
+            countLabel.isHidden = true
+        }
+        
+        // Show selection border
+        layer.borderWidth = isSelected ? 3 : 0
+        layer.borderColor = UIColor.white.cgColor
     }
 }
