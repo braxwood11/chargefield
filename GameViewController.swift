@@ -10,325 +10,441 @@ import UIKit
 class GameViewController: UIViewController, GameStateDelegate {
     
     // MARK: - Properties
-    
-    private var viewModel: GameViewModel!
-    var tutorialCompleted = false
-    private var tutorialManager: TutorialManager?
-    private var tutorialOverlay: TutorialOverlayView?
-    
-    // Default initializer
-       init() {
-           super.init(nibName: nil, bundle: nil)
-       }
-       
-       // Custom initializer with viewModel
-       init(viewModel: GameViewModel) {
-           self.viewModel = viewModel
-           super.init(nibName: nil, bundle: nil)
-           self.viewModel.delegate = self
-       }
-       
-       required init?(coder: NSCoder) {
-           super.init(coder: coder)
-       }
-    
-    private var cellViews: [[CellView]] = []
-    private var gridView: UIView!
-    
-    private var positiveButton: MagnetButton!
-    private var negativeButton: MagnetButton!
-    
-    private var resetButton: UIButton!
-    private var solutionButton: UIButton!
-    private var hintsButton: UIButton!
-    
-    private var messageView: MessageView!
-    private var instructionLabel: UILabel!
-    
-    private var progressBar: UIProgressView!
-    private var progressLabel: UILabel!
-    
-    var isLaunchedFromDashboard = false
+        
+        private var viewModel: GameViewModel!
+        var tutorialCompleted = false
+        private var tutorialManager: TutorialManager?
+        private var tutorialOverlay: TutorialOverlayView?
+        
+        // Default initializer
+        init() {
+            super.init(nibName: nil, bundle: nil)
+        }
+        
+        // Custom initializer with viewModel
+        init(viewModel: GameViewModel) {
+            self.viewModel = viewModel
+            super.init(nibName: nil, bundle: nil)
+            self.viewModel.delegate = self
+        }
+        
+        required init?(coder: NSCoder) {
+            super.init(coder: coder)
+        }
+        
+        private var cellViews: [[CellView]] = []
+        private var gridView: UIView!
+        
+        private var positiveButton: MagnetButton!
+        private var negativeButton: MagnetButton!
+        
+        private var resetButton: UIButton!
+        private var solutionButton: UIButton!
+        private var hintsButton: UIButton!
+        
+        private var messageView: MessageView!
+        private var instructionLabel: UILabel!
+        
+        private var progressBar: UIProgressView!
+        private var progressLabel: UILabel!
+        private var backgroundView: UIView! // New background view for grid pattern
+        
+        var isLaunchedFromDashboard = false
     
     // MARK: - Lifecycle Methods
     
     override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        // Force a UI update after view appears
-        updateCellViews()
-        updateUI()
-    }
-    
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Update cell views after layout is complete
-        updateCellViews()
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        // Setup the UI elements first, without updating their state
-        setupUI()
-        
-        // If viewModel is already set, configure it
-        if viewModel != nil {
-            viewModel.delegate = self
-            updateUI() // This calls updateMagnetButtons()
-            
-            // Add tutorial setup at the end if launched from dashboard
-            if isLaunchedFromDashboard {
-                setupTutorial()
-            }
-        }
-        // If launched from dashboard, we'll handle this differently
-        else if isLaunchedFromDashboard {
-            // Don't try to update UI yet - wait for viewModel to be set
-        }
-        // Original flow - initialize with default puzzle
-        else {
-            viewModel = GameViewModel(puzzle: .zPatternPuzzle())
-            viewModel.delegate = self
+            super.viewDidAppear(animated)
+            // Force a UI update after view appears
+            updateCellViews()
             updateUI()
         }
         
-        // Add tap gesture to the main view to detect taps outside the grid
-        let backgroundTapGesture = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
-        backgroundTapGesture.cancelsTouchesInView = false  // Allow taps to pass through to subviews
-        view.addGestureRecognizer(backgroundTapGesture)
-    }
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            // Update cell views after layout is complete
+            updateCellViews()
+        }
+        
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            
+            // Setup the UI elements first, without updating their state
+            setupUI()
+            
+            // If viewModel is already set, configure it
+            if viewModel != nil {
+                viewModel.delegate = self
+                updateUI() // This calls updateMagnetButtons()
+                
+                // Add tutorial setup at the end if launched from dashboard
+                if isLaunchedFromDashboard {
+                    setupTutorial()
+                }
+            }
+            // If launched from dashboard, we'll handle this differently
+            else if isLaunchedFromDashboard {
+                // Don't try to update UI yet - wait for viewModel to be set
+            }
+            // Original flow - initialize with default puzzle
+            else {
+                viewModel = GameViewModel(puzzle: .zPatternPuzzle())
+                viewModel.delegate = self
+                updateUI()
+            }
+            
+            // Add tap gesture to the main view to detect taps outside the grid
+            let backgroundTapGesture = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
+            backgroundTapGesture.cancelsTouchesInView = false  // Allow taps to pass through to subviews
+            view.addGestureRecognizer(backgroundTapGesture)
+            
+            // Add back button
+            setupBackButton()
+        }
+        
+        private func setupBackButton() {
+            // Add custom back button
+            let backButton = UIBarButtonItem(
+                image: UIImage(systemName: "chevron.left"),
+                style: .plain,
+                target: self,
+                action: #selector(returnToDashboard)
+            )
+            backButton.tintColor = .green
+            navigationItem.leftBarButtonItem = backButton
+            
+            // Set title with terminal style
+            title = "CONTAINMENT CHAMBER"
+            navigationController?.navigationBar.titleTextAttributes = [
+                NSAttributedString.Key.foregroundColor: UIColor.white,
+                NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
+            ]
+            navigationController?.navigationBar.barTintColor = .black
+            navigationController?.navigationBar.isTranslucent = false
+        }
 
-    func setViewModel(_ newViewModel: GameViewModel) {
-        self.viewModel = newViewModel
-        
-        // Set the delegate
-        self.viewModel.delegate = self
-        
-        // Only update UI if the view is loaded and buttons are initialized
-        if isViewLoaded && positiveButton != nil && negativeButton != nil {
-            updateUI()
+        func setViewModel(_ newViewModel: GameViewModel) {
+            self.viewModel = newViewModel
             
-            // Setup tutorial if this is the tutorial level and launched from dashboard
-            if isLaunchedFromDashboard && newViewModel.gameState.grid.count == 3 {
-                setupTutorial()
+            // Set the delegate
+            self.viewModel.delegate = self
+            
+            // Only update UI if the view is loaded and buttons are initialized
+            if isViewLoaded && positiveButton != nil && negativeButton != nil {
+                updateUI()
+                
+                // Setup tutorial if this is the tutorial level and launched from dashboard
+                if isLaunchedFromDashboard && newViewModel.gameState.grid.count == 3 {
+                    setupTutorial()
+                }
             }
         }
-    }
     
     // MARK: - UI Setup
     
     private func setupUI() {
-        view.backgroundColor = UIColor.systemGroupedBackground
-        
-        // Create title
-        let titleLabel = UILabel()
-        titleLabel.text = "Containment Chamber"
-        titleLabel.font = UIFont.boldSystemFont(ofSize: 32)
-        titleLabel.textAlignment = .center
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(titleLabel)
-        
-        // Create message view (initially hidden)
-        messageView = MessageView(frame: .zero)
-        messageView.setMessage("🎉 All Fields Neutralized! 🎉")
-        messageView.translatesAutoresizingMaskIntoConstraints = false
-        messageView.isHidden = true
-        view.addSubview(messageView)
-        
-        // Create grid - moved up
-        setupGrid()
-        
-        // Create buttons
-        setupMagnetButtons()
-        setupControlButtons()
-        
-        // Create progress bar
-        setupProgressBar()
-        
-        // Set constraints with proper centering
-        NSLayoutConstraint.activate([
-            // Title
-            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 25),
-            titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            
-            // Message view
-            messageView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
-            messageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            messageView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            messageView.heightAnchor.constraint(equalToConstant: 44),
-            
-            // Grid - centered and moved up
-            gridView.topAnchor.constraint(equalTo: messageView.bottomAnchor, constant: 20),
-            gridView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            gridView.widthAnchor.constraint(equalToConstant: 300),
-            gridView.heightAnchor.constraint(equalToConstant: 300),
-            
-            // Center the magnet buttons container horizontally
-            positiveButton.topAnchor.constraint(equalTo: gridView.bottomAnchor, constant: 40),
-            positiveButton.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: -60), // Left of center
-            positiveButton.widthAnchor.constraint(equalToConstant: 100),
-            positiveButton.heightAnchor.constraint(equalToConstant: 100),
-            
-            negativeButton.topAnchor.constraint(equalTo: positiveButton.topAnchor),
-            negativeButton.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: 60), // Right of center
-            negativeButton.widthAnchor.constraint(equalToConstant: 100),
-            negativeButton.heightAnchor.constraint(equalToConstant: 100),
-            
-            // Solution button to left of all buttons
-            solutionButton.centerYAnchor.constraint(equalTo: positiveButton.centerYAnchor),
-            solutionButton.trailingAnchor.constraint(equalTo: positiveButton.leadingAnchor, constant: -25),
-            solutionButton.widthAnchor.constraint(equalToConstant: 60),
-            solutionButton.heightAnchor.constraint(equalToConstant: 60),
-            
-            // Reset button to right of all buttons
-            resetButton.centerYAnchor.constraint(equalTo: positiveButton.centerYAnchor),
-            resetButton.leadingAnchor.constraint(equalTo: negativeButton.trailingAnchor, constant: 25),
-            resetButton.widthAnchor.constraint(equalToConstant: 60),
-            resetButton.heightAnchor.constraint(equalToConstant: 60),
-            
-            // Progress bar (below magnet buttons with more space)
-            progressBar.topAnchor.constraint(equalTo: positiveButton.bottomAnchor, constant: 30),
-            progressBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
-            progressBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
-            progressBar.heightAnchor.constraint(equalToConstant: 12),
-            
-            // Progress label
-            progressLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 4),
-            progressLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-        ])
-    }
-    
-    private func setupProgressBar() {
-        // Create progress bar to show neutralization progress
-        progressBar = UIProgressView(progressViewStyle: .default)
-        progressBar.trackTintColor = UIColor.white.withAlphaComponent(0.3)
-        progressBar.progressTintColor = UIColor.green
-        progressBar.layer.cornerRadius = 5
-        progressBar.clipsToBounds = true
-        progressBar.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(progressBar)
-        
-        // Create progress label
-        progressLabel = UILabel()
-        progressLabel.font = UIFont.systemFont(ofSize: 12)
-        progressLabel.textColor = .darkGray
-        progressLabel.textAlignment = .center
-        progressLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(progressLabel)
-        
-        // Set initial progress
-        updateProgressDisplay()
-    }
-    
-    private func setupMagnetButtons() {
-        // Positive magnet button
-        positiveButton = MagnetButton(frame: .zero)
-        positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
-        positiveButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
-        positiveButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(positiveButton)
-        
-        // Negative magnet button
-        negativeButton = MagnetButton(frame: .zero)
-        negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
-        negativeButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
-        negativeButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(negativeButton)
-    }
-    
-    private func setupGrid() {
-        // Create container for the grid
-        gridView = UIView(frame: .zero)
-        gridView.backgroundColor = UIColor.white.withAlphaComponent(0.5)
-        gridView.layer.cornerRadius = 8
-        gridView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(gridView)
-        
-        // Create the cells
-        recreateGridCells()
-    }
-    
-    private func setupControlButtons() {
-        // Solution button - now a circular button with a different symbol and color
-        solutionButton = UIButton(type: .system)
-        solutionButton.backgroundColor = UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Purple color
-        solutionButton.setTitleColor(.white, for: .normal)
-        solutionButton.layer.cornerRadius = 30 // Make it circular
-        
-        // Use a hint/solution icon (puzzle piece)
-        let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        let solutionImage = UIImage(systemName: "puzzlepiece.fill", withConfiguration: configuration)
-        solutionButton.setImage(solutionImage, for: .normal)
-        solutionButton.tintColor = .white
-        
-        solutionButton.addTarget(self, action: #selector(solutionButtonTapped), for: .touchUpInside)
-        solutionButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(solutionButton)
-        
-        // Reset button - circular with a symbol
-        resetButton = UIButton(type: .system)
-        resetButton.backgroundColor = .lightGray
-        resetButton.setTitleColor(.white, for: .normal)
-        resetButton.layer.cornerRadius = 30 // Make it circular
-        
-        // Use a reset/refresh symbol
-        let resetImage = UIImage(systemName: "arrow.counterclockwise", withConfiguration: configuration)
-        resetButton.setImage(resetImage, for: .normal)
-        resetButton.tintColor = .white
-        
-        resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
-        resetButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(resetButton)
-        /*
-        // New Puzzle button
-        let newPuzzleButton = UIButton(type: .system)
-        newPuzzleButton.setTitle("New Puzzle", for: .normal)
-        newPuzzleButton.backgroundColor = .orange
-        newPuzzleButton.setTitleColor(.white, for: .normal)
-        newPuzzleButton.layer.cornerRadius = 8
-        newPuzzleButton.addTarget(self, action: #selector(newPuzzleButtonTapped), for: .touchUpInside)
-        newPuzzleButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(newPuzzleButton)
-        
-        // Set constraints for new puzzle button
-        NSLayoutConstraint.activate([
-            newPuzzleButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            newPuzzleButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            newPuzzleButton.widthAnchor.constraint(equalToConstant: 160),
-            newPuzzleButton.heightAnchor.constraint(equalToConstant: 44)
-         
-        ])
-         */
-    }
-    
-    /*
-    private func setupInstructions() {
-        // Create instructions label with updated game concept
-        instructionLabel = UILabel()
-        instructionLabel.text = """
-        How To Play:
-        • Neutralize fields by bringing their charge to zero
-        • Place + and - magnets on the grid to influence charges
-        • Each magnet has influence: 3 in its cell, 2 adjacent, 1 two spaces away
-        • Tap once to preview influence, tap again to place
-        """
-        instructionLabel.numberOfLines = 0
-        instructionLabel.textAlignment = .left
-        instructionLabel.font = UIFont.systemFont(ofSize: 14)
-        instructionLabel.backgroundColor = .white
-        instructionLabel.layer.cornerRadius = 8
-        instructionLabel.clipsToBounds = true
-        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(instructionLabel)
-        
-        NSLayoutConstraint.activate([
-            instructionLabel.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 60),
-            instructionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            instructionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            instructionLabel.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20)
-        ])
-    }
-    */
+           // Set black background
+           view.backgroundColor = .black
+           
+           // Setup background grid
+           setupGridBackground()
+           
+           // Create status container
+           let statusContainer = createStatusContainer()
+           view.addSubview(statusContainer)
+           
+           // Create message view (initially hidden)
+            messageView = MessageView(frame: .zero)
+            messageView.setMessage("⚡ ALL FIELDS NEUTRALIZED ⚡")
+            messageView.translatesAutoresizingMaskIntoConstraints = false
+            messageView.isHidden = true
+            messageView.updateStyleForTerminalTheme()  // Apply terminal styling
+            view.addSubview(messageView)
+           
+           // Create grid - moved up
+           setupGrid()
+           
+           // Create buttons
+           setupMagnetButtons()
+           setupControlButtons()
+           
+           // Create progress bar
+           setupProgressBar()
+           
+           // Set constraints with proper centering
+           NSLayoutConstraint.activate([
+               // Status container
+               statusContainer.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 15),
+               statusContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+               statusContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+               
+               // Message view
+               messageView.topAnchor.constraint(equalTo: statusContainer.bottomAnchor, constant: 10),
+               messageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+               messageView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+               messageView.heightAnchor.constraint(equalToConstant: 44),
+               
+               // Grid - centered and moved up
+               gridView.topAnchor.constraint(equalTo: messageView.bottomAnchor, constant: 20),
+               gridView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+               gridView.widthAnchor.constraint(equalToConstant: 300),
+               gridView.heightAnchor.constraint(equalToConstant: 300),
+               
+               // Center the magnet buttons container horizontally
+               positiveButton.topAnchor.constraint(equalTo: gridView.bottomAnchor, constant: 40),
+               positiveButton.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: -60), // Left of center
+               positiveButton.widthAnchor.constraint(equalToConstant: 100),
+               positiveButton.heightAnchor.constraint(equalToConstant: 100),
+               
+               negativeButton.topAnchor.constraint(equalTo: positiveButton.topAnchor),
+               negativeButton.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: 60), // Right of center
+               negativeButton.widthAnchor.constraint(equalToConstant: 100),
+               negativeButton.heightAnchor.constraint(equalToConstant: 100),
+               
+               // Solution button to left of all buttons
+               solutionButton.centerYAnchor.constraint(equalTo: positiveButton.centerYAnchor),
+               solutionButton.trailingAnchor.constraint(equalTo: positiveButton.leadingAnchor, constant: -25),
+               solutionButton.widthAnchor.constraint(equalToConstant: 60),
+               solutionButton.heightAnchor.constraint(equalToConstant: 60),
+               
+               // Reset button to right of all buttons
+               resetButton.centerYAnchor.constraint(equalTo: positiveButton.centerYAnchor),
+               resetButton.leadingAnchor.constraint(equalTo: negativeButton.trailingAnchor, constant: 25),
+               resetButton.widthAnchor.constraint(equalToConstant: 60),
+               resetButton.heightAnchor.constraint(equalToConstant: 60),
+               
+               // Progress bar (below magnet buttons with more space)
+               progressBar.topAnchor.constraint(equalTo: positiveButton.bottomAnchor, constant: 30),
+               progressBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+               progressBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+               progressBar.heightAnchor.constraint(equalToConstant: 12),
+               
+               // Progress label
+               progressLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 4),
+               progressLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+           ])
+       }
+       
+       private func setupGridBackground() {
+           // Create a grid pattern background
+           backgroundView = UIView(frame: view.bounds)
+           backgroundView.backgroundColor = .clear
+           backgroundView.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(backgroundView)
+           view.sendSubviewToBack(backgroundView)
+           
+           // Create grid lines
+           let gridSize: CGFloat = 30
+           let lineWidth: CGFloat = 0.5
+           let lineColor = UIColor.green.withAlphaComponent(0.2)
+           
+           // Horizontal lines
+           for y in stride(from: 0, to: view.bounds.height, by: gridSize) {
+               let lineView = UIView(frame: CGRect(x: 0, y: y, width: view.bounds.width, height: lineWidth))
+               lineView.backgroundColor = lineColor
+               backgroundView.addSubview(lineView)
+           }
+           
+           // Vertical lines
+           for x in stride(from: 0, to: view.bounds.width, by: gridSize) {
+               let lineView = UIView(frame: CGRect(x: x, y: 0, width: lineWidth, height: view.bounds.height))
+               lineView.backgroundColor = lineColor
+               backgroundView.addSubview(lineView)
+           }
+           
+           // Add glow dots at random intersections
+           let intersections = min(15, Int((view.bounds.width / gridSize) * (view.bounds.height / gridSize) / 12))
+           
+           for _ in 0..<intersections {
+               let randomX = Int.random(in: 1..<Int(view.bounds.width / gridSize)) * Int(gridSize)
+               let randomY = Int.random(in: 1..<Int(view.bounds.height / gridSize)) * Int(gridSize)
+               
+               let dotSize: CGFloat = 4
+               let dotView = UIView(frame: CGRect(x: CGFloat(randomX) - dotSize/2, y: CGFloat(randomY) - dotSize/2, width: dotSize, height: dotSize))
+               dotView.backgroundColor = .green
+               dotView.layer.cornerRadius = dotSize/2
+               dotView.alpha = CGFloat.random(in: 0.2...0.6)
+               backgroundView.addSubview(dotView)
+               
+               // Add pulse animation to some dots
+               if Bool.random() {
+                   animateDotPulse(dotView)
+               }
+           }
+       }
+       
+       private func animateDotPulse(_ dotView: UIView) {
+           UIView.animate(withDuration: Double.random(in: 1.5...3.0), delay: 0, options: [.repeat, .autoreverse], animations: {
+               dotView.alpha = CGFloat.random(in: 0.1...0.3)
+           })
+       }
+       
+       private func createStatusContainer() -> UIView {
+           let containerView = UIView()
+           containerView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+           containerView.layer.borderColor = UIColor.green.withAlphaComponent(0.5).cgColor
+           containerView.layer.borderWidth = 1
+           containerView.layer.cornerRadius = 8
+           containerView.translatesAutoresizingMaskIntoConstraints = false
+           
+           // Terminal prompt
+           let promptLabel = UILabel()
+           promptLabel.text = "chamber> anomaly_stabilization_active"
+           promptLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+           promptLabel.textColor = .green
+           promptLabel.translatesAutoresizingMaskIntoConstraints = false
+           containerView.addSubview(promptLabel)
+           
+           // Status message
+           let statusLabel = UILabel()
+           statusLabel.text = "Neutralize all field anomalies"
+           statusLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
+           statusLabel.textColor = .white
+           statusLabel.translatesAutoresizingMaskIntoConstraints = false
+           containerView.addSubview(statusLabel)
+           
+           // Set constraints
+           NSLayoutConstraint.activate([
+               promptLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 12),
+               promptLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 15),
+               promptLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -15),
+               
+               statusLabel.topAnchor.constraint(equalTo: promptLabel.bottomAnchor, constant: 8),
+               statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 15),
+               statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -15),
+               statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: containerView.bottomAnchor, constant: -12)
+           ])
+           
+           // Height constraint to ensure proper size
+           let heightConstraint = containerView.heightAnchor.constraint(equalToConstant: 70)
+           heightConstraint.priority = .defaultHigh
+           heightConstraint.isActive = true
+           
+           return containerView
+       }
+       
+       private func setupProgressBar() {
+           // Create progress bar to show neutralization progress
+           progressBar = UIProgressView(progressViewStyle: .default)
+           progressBar.trackTintColor = UIColor.white.withAlphaComponent(0.3)
+           progressBar.progressTintColor = UIColor.green
+           progressBar.layer.cornerRadius = 5
+           progressBar.clipsToBounds = true
+           progressBar.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(progressBar)
+           
+           // Create progress label
+           progressLabel = UILabel()
+           progressLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+           progressLabel.textColor = .green
+           progressLabel.textAlignment = .center
+           progressLabel.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(progressLabel)
+           
+           // Set initial progress
+           updateProgressDisplay()
+       }
+       
+       private func setupMagnetButtons() {
+           // Positive magnet button
+           positiveButton = MagnetButton(frame: .zero)
+           positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
+           positiveButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
+           positiveButton.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(positiveButton)
+           
+           // Negative magnet button
+           negativeButton = MagnetButton(frame: .zero)
+           negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
+           negativeButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
+           negativeButton.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(negativeButton)
+           
+           // Style updates
+           positiveButton.layer.borderWidth = 2
+           positiveButton.layer.borderColor = UIColor.red.withAlphaComponent(0.5).cgColor
+           negativeButton.layer.borderWidth = 2
+           negativeButton.layer.borderColor = UIColor.blue.withAlphaComponent(0.5).cgColor
+       }
+       
+       private func setupGrid() {
+           // Create container for the grid
+               gridView = UIView(frame: .zero)
+               gridView.backgroundColor = UIColor.black
+               gridView.layer.cornerRadius = 8
+               gridView.layer.borderWidth = 2
+               gridView.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+               gridView.translatesAutoresizingMaskIntoConstraints = false
+               view.addSubview(gridView)
+               
+               // Create the cells
+               recreateGridCells()
+               
+               // Add glow effect
+               gridView.layer.shadowColor = UIColor.green.cgColor
+               gridView.layer.shadowOffset = CGSize.zero
+               gridView.layer.shadowRadius = 10
+               gridView.layer.shadowOpacity = 0.3
+       }
+       
+       private func setupControlButtons() {
+           // Solution button - now a circular button with a different symbol and color
+           solutionButton = UIButton(type: .system)
+           solutionButton.backgroundColor = UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Purple color
+           solutionButton.setTitleColor(.white, for: .normal)
+           solutionButton.layer.cornerRadius = 30 // Make it circular
+           
+           // Use a hint/solution icon (puzzle piece)
+           let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+           let solutionImage = UIImage(systemName: "puzzlepiece.fill", withConfiguration: configuration)
+           solutionButton.setImage(solutionImage, for: .normal)
+           solutionButton.tintColor = .white
+           
+           solutionButton.addTarget(self, action: #selector(solutionButtonTapped), for: .touchUpInside)
+           solutionButton.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(solutionButton)
+           
+           // Reset button - circular with a symbol
+           resetButton = UIButton(type: .system)
+           resetButton.backgroundColor = .black
+           resetButton.setTitleColor(.white, for: .normal)
+           resetButton.layer.cornerRadius = 30 // Make it circular
+           resetButton.layer.borderWidth = 2
+           resetButton.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+           
+           // Use a reset/refresh symbol
+           let resetImage = UIImage(systemName: "arrow.counterclockwise", withConfiguration: configuration)
+           resetButton.setImage(resetImage, for: .normal)
+           resetButton.tintColor = .green
+           
+           resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
+           resetButton.translatesAutoresizingMaskIntoConstraints = false
+           view.addSubview(resetButton)
+           
+           // Add button press effects
+           addButtonPressEffects(solutionButton)
+           addButtonPressEffects(resetButton)
+       }
+       
+       private func addButtonPressEffects(_ button: UIButton) {
+           button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+           button.addTarget(self, action: #selector(buttonTouchUpOutside(_:)), for: .touchUpOutside)
+           button.addTarget(self, action: #selector(buttonTouchUpOutside(_:)), for: .touchCancel)
+       }
+       
+       @objc private func buttonTouchDown(_ sender: UIButton) {
+           UIView.animate(withDuration: 0.1) {
+               sender.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+               sender.alpha = 0.8
+           }
+       }
+       
+       @objc private func buttonTouchUpOutside(_ sender: UIButton) {
+           UIView.animate(withDuration: 0.1) {
+               sender.transform = CGAffineTransform.identity
+               sender.alpha = 1.0
+           }
+       }
     
     // MARK: - Tutorial Handlers
     
@@ -346,6 +462,10 @@ class GameViewController: UIViewController, GameStateDelegate {
         tutorialOverlay = TutorialOverlayView(frame: view.bounds)
         if let tutorialOverlay = tutorialOverlay {
             tutorialOverlay.setNextButtonAction(self, action: #selector(advanceTutorial))
+            
+            // Apply styling without changing constraints
+            tutorialOverlay.adjustLayoutForTutorialStep()
+            
             view.addSubview(tutorialOverlay)
             updateTutorialState()
         }
@@ -364,7 +484,13 @@ class GameViewController: UIViewController, GameStateDelegate {
         tutorialOverlay.setInstructionText(tutorialManager.getInstructionText())
         
         // Show next button only for steps that don't require action
-        tutorialOverlay.showNextButton(!tutorialManager.requiresAction())
+        let showNextButton = !tutorialManager.requiresAction()
+        tutorialOverlay.showNextButton(showNextButton)
+        
+        // Make the button more visible when shown
+        if showNextButton {
+            tutorialOverlay.animateNextButton()
+        }
         
         // Handle overlay visibility based on step
         if tutorialManager.currentStep == .completeTask {
@@ -641,6 +767,9 @@ class GameViewController: UIViewController, GameStateDelegate {
                 cellView.showHints = viewModel.gameState.showHints
                 cellView.selectedMagnetType = viewModel.gameState.selectedMagnetType
                 
+                // Apply terminal styling to the cell
+                cellView.updateStyleForTerminalTheme()
+                
                 // Position the cell
                 let x = CGFloat(col) * (cellSize + 4) + 2
                 let y = CGFloat(row) * (cellSize + 4) + 2
@@ -766,87 +895,89 @@ class GameViewController: UIViewController, GameStateDelegate {
     
     @objc private func hintsButtonTapped() {
         viewModel.toggleHints()
-        updateHintsButton()
         updateCellViews()
     }
     
     // MARK: - UI Update Methods
     
     private func updateUI() {
-        updateMagnetButtons()
-        updateCellViews()
-        updateSolutionButton()
-        updateMessageView()
-        updateProgressDisplay()
-    }
-
-    
-    private func updateMagnetButtons() {
-        positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
-        negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
-        negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
-    }
-    
-    private func updateCellViews() {
-        for row in 0..<cellViews.count {
-            for col in 0..<cellViews[row].count {
-                cellViews[row][col].cell = viewModel.gameState.grid[row][col]
-                cellViews[row][col].showHints = viewModel.gameState.showHints
-                cellViews[row][col].selectedMagnetType = viewModel.gameState.selectedMagnetType
-            }
+            updateMagnetButtons()
+            updateCellViews()
+            updateSolutionButton()
+            updateMessageView()
+            updateProgressDisplay()
         }
-    }
-    
-    private func updateSolutionButton() {
-        // Use a different icon when showing solution
-        let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        let iconName = viewModel.gameState.showSolution ? "eye.slash.fill" : "puzzlepiece.fill"
-        let icon = UIImage(systemName: iconName, withConfiguration: configuration)
-        solutionButton.setImage(icon, for: .normal)
+
+        private func updateMagnetButtons() {
+            positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
+            negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
+        }
         
-        // Change background color when showing solution
-        solutionButton.backgroundColor = viewModel.gameState.showSolution
-            ? UIColor(red: 0.4, green: 0.3, blue: 0.6, alpha: 1.0) // Darker purple
-            : UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Regular purple
-    }
-    
-    private func updateHintsButton() {
-        hintsButton.setTitle(viewModel.gameState.showHints ? "Hide Hints" : "Show Hints", for: .normal)
-    }
-    
-    private func updateMessageView() {
-        messageView.isHidden = !(viewModel.gameState.puzzleSolved && !viewModel.gameState.showSolution)
-    }
-    
-    // Update progress bar and status label
-    private func updateProgressDisplay() {
-        // Count the total number of target cells (cells with initial charge)
-        var totalTargetCells = 0
-        var neutralizedCells = 0
-        
-        for row in 0..<viewModel.gameState.grid.count {
-            for col in 0..<viewModel.gameState.grid[row].count {
-                let cell = viewModel.gameState.grid[row][col]
-                if cell.initialCharge != 0 {
-                    totalTargetCells += 1
-                    if cell.isNeutralized {
-                        neutralizedCells += 1
-                    }
+        private func updateCellViews() {
+            for row in 0..<cellViews.count {
+                for col in 0..<cellViews[row].count {
+                    cellViews[row][col].cell = viewModel.gameState.grid[row][col]
+                    cellViews[row][col].showHints = viewModel.gameState.showHints
+                    cellViews[row][col].selectedMagnetType = viewModel.gameState.selectedMagnetType
                 }
             }
         }
-        
-        // Calculate progress
-        let progress = totalTargetCells > 0 ? Float(neutralizedCells) / Float(totalTargetCells) : 0.0
-        
-        // Update progress bar with animation
-        UIView.animate(withDuration: 0.3) {
-            self.progressBar.setProgress(progress, animated: true)
+    
+    private func updateSolutionButton() {
+            // Use a different icon when showing solution
+            let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+            let iconName = viewModel.gameState.showSolution ? "eye.slash.fill" : "puzzlepiece.fill"
+            let icon = UIImage(systemName: iconName, withConfiguration: configuration)
+            solutionButton.setImage(icon, for: .normal)
+            
+            // Change background color when showing solution
+            solutionButton.backgroundColor = viewModel.gameState.showSolution
+                ? UIColor.black
+                : UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Regular purple
+            
+            if viewModel.gameState.showSolution {
+                solutionButton.layer.borderWidth = 2
+                solutionButton.layer.borderColor = UIColor.purple.withAlphaComponent(0.7).cgColor
+                solutionButton.tintColor = .purple
+            } else {
+                solutionButton.layer.borderWidth = 0
+                solutionButton.tintColor = .white
+            }
         }
         
-        // Update progress label
-        progressLabel.text = "\(neutralizedCells) / \(totalTargetCells) fields neutralized"
-    }
+        private func updateMessageView() {
+            messageView.isHidden = !(viewModel.gameState.puzzleSolved && !viewModel.gameState.showSolution)
+        }
+        
+        // Update progress bar and status label
+        private func updateProgressDisplay() {
+            // Count the total number of target cells (cells with initial charge)
+            var totalTargetCells = 0
+            var neutralizedCells = 0
+            
+            for row in 0..<viewModel.gameState.grid.count {
+                for col in 0..<viewModel.gameState.grid[row].count {
+                    let cell = viewModel.gameState.grid[row][col]
+                    if cell.initialCharge != 0 {
+                        totalTargetCells += 1
+                        if cell.isNeutralized {
+                            neutralizedCells += 1
+                        }
+                    }
+                }
+            }
+            
+            // Calculate progress
+            let progress = totalTargetCells > 0 ? Float(neutralizedCells) / Float(totalTargetCells) : 0.0
+            
+            // Update progress bar with animation
+            UIView.animate(withDuration: 0.3) {
+                self.progressBar.setProgress(progress, animated: true)
+            }
+            
+            // Update progress label with monospaced font
+            progressLabel.text = "\(neutralizedCells)/\(totalTargetCells) FIELDS NEUTRALIZED"
+        }
     
     // MARK: - GameStateDelegate Methods
     

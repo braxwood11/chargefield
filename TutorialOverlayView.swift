@@ -14,50 +14,69 @@ class TutorialOverlayView: UIView {
     private var highlightedFrame: CGRect?
     var allowFullInteraction = false
     
+    private var instructionTopConstraint: NSLayoutConstraint?
+    private var instructionCenterYConstraint: NSLayoutConstraint?
+    private var buttonTopConstraint: NSLayoutConstraint?
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        
-        // Instruction label
-        instructionLabel.textColor = .white
-        instructionLabel.font = UIFont.systemFont(ofSize: 18, weight: .medium)
-        instructionLabel.numberOfLines = 0
-        instructionLabel.textAlignment = .center
-        instructionLabel.backgroundColor = UIColor.darkGray.withAlphaComponent(0.8)
-        instructionLabel.layer.cornerRadius = 10
-        instructionLabel.clipsToBounds = true
-        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(instructionLabel)
-        
-        // Next button
-        nextButton.setTitle("Next", for: .normal)
-        nextButton.backgroundColor = .systemBlue
-        nextButton.setTitleColor(.white, for: .normal)
-        nextButton.layer.cornerRadius = 8
-        nextButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(nextButton)
-        
-        // Highlight view - will be positioned over the element to highlight
-        highlightView.layer.borderColor = UIColor.yellow.cgColor
-        highlightView.layer.borderWidth = 3
-        highlightView.layer.cornerRadius = 8
-        highlightView.clipsToBounds = true
-        highlightView.isUserInteractionEnabled = false
-        addSubview(highlightView)
-        
-        // Set constraints for instruction label and next button
-        NSLayoutConstraint.activate([
-            instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            instructionLabel.bottomAnchor.constraint(equalTo: nextButton.topAnchor, constant: -20),
-            instructionLabel.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.8),
-            instructionLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
+        func setupConstraintReferences() {
+            // Store references to constraints we'll need to modify
+            instructionCenterYConstraint = instructionLabel.constraints.first {
+                $0.firstAttribute == .centerY && $0.secondItem === self
+            }
             
-            nextButton.centerXAnchor.constraint(equalTo: centerXAnchor),
-            nextButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -50),
-            nextButton.widthAnchor.constraint(equalToConstant: 120),
-            nextButton.heightAnchor.constraint(equalToConstant: 44)
-        ])
+            buttonTopConstraint = nextButton.constraints.first {
+                $0.firstAttribute == .top && $0.secondItem === instructionLabel
+            }
+        }
+        
+        // Instruction label - positioned higher in the screen
+            instructionLabel.textColor = .white
+            instructionLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .medium)
+            instructionLabel.numberOfLines = 0
+            instructionLabel.textAlignment = .center
+            instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+            instructionLabel.layer.cornerRadius = 10
+            instructionLabel.layer.borderWidth = 1
+            instructionLabel.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+            instructionLabel.clipsToBounds = true
+            instructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(instructionLabel)
+            
+            // Next button - styled like other terminal controls
+            nextButton.setTitle("NEXT", for: .normal)
+            nextButton.backgroundColor = UIColor.black
+            nextButton.setTitleColor(.green, for: .normal)
+            nextButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
+            nextButton.layer.cornerRadius = 8
+            nextButton.layer.borderWidth = 2
+            nextButton.layer.borderColor = UIColor.green.cgColor
+            nextButton.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(nextButton)
+            
+            // Highlight view
+            highlightView.layer.borderColor = UIColor.green.cgColor
+            highlightView.layer.borderWidth = 3
+            highlightView.layer.cornerRadius = 8
+            highlightView.clipsToBounds = true
+            highlightView.isUserInteractionEnabled = false
+            addSubview(highlightView)
+            
+            // Position the instruction in the middle of the screen
+            // and the button a bit below it
+            NSLayoutConstraint.activate([
+                instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+                instructionLabel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -50), // Higher position
+                instructionLabel.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.85),
+                instructionLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 60),
+                
+                nextButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+                nextButton.topAnchor.constraint(equalTo: instructionLabel.bottomAnchor, constant: 20),
+                nextButton.widthAnchor.constraint(equalToConstant: 130),
+                nextButton.heightAnchor.constraint(equalToConstant: 44)
+            ])
     }
     
     required init?(coder: NSCoder) {
@@ -110,6 +129,40 @@ class TutorialOverlayView: UIView {
         layer.mask = maskLayer
     }
     
+    // Method to make the Next button more visible
+    func animateNextButton() {
+        UIView.animate(withDuration: 0.8, delay: 0, options: [.repeat, .autoreverse], animations: {
+            self.nextButton.alpha = 0.7
+        }) { _ in
+            self.nextButton.alpha = 1.0
+        }
+    }
+
+    // Method to update button style to match terminal theme
+    func updateNextButtonStyle() {
+        nextButton.setTitle("NEXT", for: .normal)
+        nextButton.backgroundColor = UIColor.black
+        nextButton.setTitleColor(.green, for: .normal)
+        nextButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        nextButton.layer.cornerRadius = 8
+        nextButton.layer.borderWidth = 2
+        nextButton.layer.borderColor = UIColor.green.cgColor
+    }
+
+    func adjustLayoutForTutorialStep() {
+        // Update next button style to match terminal theme
+        nextButton.setTitle("NEXT", for: .normal)
+        nextButton.backgroundColor = UIColor.black
+        nextButton.setTitleColor(.green, for: .normal)
+        nextButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        nextButton.layer.cornerRadius = 8
+        nextButton.layer.borderWidth = 2
+        nextButton.layer.borderColor = UIColor.green.cgColor
+        
+        // Make button bigger and more visible
+        nextButton.bounds = CGRect(x: 0, y: 0, width: 150, height: 50)
+    }
+    
     func highlightElement(_ element: UIView) {
             // Convert the element's frame to this view's coordinate system
             if let window = element.window, let elementSuperview = element.superview {
@@ -152,45 +205,29 @@ class TutorialOverlayView: UIView {
     }
     
     func positionInstructionsAtTop() {
-        // Remove existing constraints
-        instructionLabel.removeFromSuperview()
-        addSubview(instructionLabel)
+        // Deactivate center constraint and create top constraint if needed
+        instructionCenterYConstraint?.isActive = false
         
-        // Clear existing constraints
-        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.deactivate(instructionLabel.constraints)
+        if instructionTopConstraint == nil {
+            instructionTopConstraint = instructionLabel.topAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.topAnchor, constant: 20)
+        }
         
-        // Position at top of screen
-        NSLayoutConstraint.activate([
-            instructionLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 70),
-            instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            instructionLabel.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.8),
-            instructionLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 50)
-        ])
+        instructionTopConstraint?.isActive = true
         
-        // Make the instruction background more visible against clear overlay
-        instructionLabel.backgroundColor = UIColor.darkGray.withAlphaComponent(0.9)
+        // Make the instruction background more visible
+        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.9)
+        instructionLabel.layer.borderWidth = 1
+        instructionLabel.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
     }
 
     func resetInstructionPosition() {
-        // Remove existing constraints
-        instructionLabel.removeFromSuperview()
-        addSubview(instructionLabel)
-        
-        // Reset to original position
-        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.deactivate(instructionLabel.constraints)
-        
-        // Original position (center of screen or above next button)
-        NSLayoutConstraint.activate([
-            instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            instructionLabel.bottomAnchor.constraint(equalTo: nextButton.topAnchor, constant: -20),
-            instructionLabel.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.8),
-            instructionLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 80)
-        ])
+        // Deactivate top constraint and reactivate center constraint
+        instructionTopConstraint?.isActive = false
+        instructionCenterYConstraint?.isActive = true
         
         // Reset background
-        instructionLabel.backgroundColor = UIColor.darkGray.withAlphaComponent(0.8)
+        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
     }
     
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
