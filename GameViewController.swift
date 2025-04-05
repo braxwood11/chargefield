@@ -463,22 +463,25 @@ class GameViewController: UIViewController, GameStateDelegate {
         if let tutorialOverlay = tutorialOverlay {
             tutorialOverlay.setNextButtonAction(self, action: #selector(advanceTutorial))
             
-            // Apply styling without changing constraints
-            tutorialOverlay.adjustLayoutForTutorialStep()
-            
             view.addSubview(tutorialOverlay)
             updateTutorialState()
         }
     }
 
     @objc private func advanceTutorial() {
-        tutorialManager?.advanceToNextStep()
-        updateTutorialState()
+        print("Advance Tutorial called")
+            print("Tutorial Manager: \(String(describing: tutorialManager))")
+            tutorialManager?.advanceToNextStep()
+            print("Current Step: \(String(describing: tutorialManager?.currentStep))")
+            updateTutorialState()
     }
 
     private func updateTutorialState() {
         guard let tutorialManager = tutorialManager,
               let tutorialOverlay = tutorialOverlay else { return }
+        
+        print("Updating tutorial state")
+            print("Current step: \(tutorialManager.currentStep)")
         
         // Update instruction text
         tutorialOverlay.setInstructionText(tutorialManager.getInstructionText())

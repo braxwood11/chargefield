@@ -88,8 +88,34 @@ class TutorialOverlayView: UIView {
     }
     
     func setNextButtonAction(_ target: Any?, action: Selector) {
-        nextButton.addTarget(target, action: action, for: .touchUpInside)
-    }
+            print("Setting next button action")
+            print("Target: \(String(describing: target))")
+            print("Selector: \(action)")
+            
+            // Remove any existing targets first
+            nextButton.removeTarget(nil, action: nil, for: .touchUpInside)
+            
+            // Add the new target
+            nextButton.addTarget(target, action: action, for: .touchUpInside)
+            
+            // Debug: Add a manual tap recognizer
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(debugButtonTap))
+            nextButton.addGestureRecognizer(tapGesture)
+            
+            // Ensure button can be interacted with
+            nextButton.isUserInteractionEnabled = true
+            nextButton.isEnabled = true
+        }
+    
+    @objc private func debugButtonTap() {
+            print("DEBUG: Next button tapped manually!")
+            
+            // Print button details
+            print("Button frame: \(nextButton.frame)")
+            print("Button is user interaction enabled: \(nextButton.isUserInteractionEnabled)")
+            print("Button is enabled: \(nextButton.isEnabled)")
+            print("Button is in view hierarchy: \(nextButton.superview != nil)")
+        }
     
     func highlightMultipleElements(_ elements: [UIView?]) {
         // Clear any existing highlights
@@ -231,6 +257,7 @@ class TutorialOverlayView: UIView {
     }
     
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        
             // If full interaction is allowed, only intercept touches on the overlay UI elements
             if allowFullInteraction {
                 return nextButton.frame.contains(point) || instructionLabel.frame.contains(point)

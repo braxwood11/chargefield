@@ -680,3 +680,36 @@ class MagnetButton: UIButton {
         }
     }
 }
+
+// Add these extensions at the end of Views.swift
+extension CellView {
+    func updateStyleForTerminalTheme() {
+        // Update cell background to black
+        backgroundColor = .black
+        
+        // Update border
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.green.withAlphaComponent(0.5).cgColor
+        
+        // Update label styles
+        chargeLabel.font = UIFont.monospacedSystemFont(ofSize: chargeLabel.font.pointSize, weight: .bold)
+        
+        // Update cell look
+        updateAppearance()
+    }
+    
+    // We can't actually override updateAppearance since it's not marked as open/public
+    // Instead, modify the original updateAppearance method to include terminal styling
+}
+
+extension MessageView {
+    func updateStyleForTerminalTheme() {
+        backgroundColor = UIColor.black
+        layer.borderColor = UIColor.green.cgColor
+        layer.borderWidth = 1
+        
+        // Update label style
+        messageLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        messageLabel.textColor = .green
+    }
+}
