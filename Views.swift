@@ -17,6 +17,7 @@ class CellView: UIView {
     private let magnetView = UIView()
     private let magnetSymbol = UILabel()
     private let neutralizedIndicator = UIView()
+    var previewValue: Int? = nil
     
     // Progress indicator component
     private let fillBarView = UIView()
@@ -168,10 +169,10 @@ class CellView: UIView {
         layer.borderColor = cell.isSelected ? UIColor.black.cgColor : UIColor.lightGray.cgColor
         
         // Show magnet if present
-        if cell.magnetValue != 0 {
+        if cell.toolEffect != 0 {
             magnetView.isHidden = false
-            magnetView.backgroundColor = cell.magnetValue > 0 ? .red : .blue
-            magnetSymbol.text = cell.magnetValue > 0 ? "+" : "-"
+            magnetView.backgroundColor = cell.toolEffect > 0 ? .red : .blue
+            magnetSymbol.text = cell.toolEffect > 0 ? "+" : "-"
         } else {
             magnetView.isHidden = true
         }
@@ -421,8 +422,6 @@ class CellView: UIView {
         }
     }
     
-    // Show influence preview based on intensity
-    // Corrected showInfluence method in CellView
     func showInfluence(intensity: Int, magnetType: Int) {
         // Only show influence preview if not selected
         guard let cell = cell, !cell.isSelected else { return }
@@ -430,17 +429,14 @@ class CellView: UIView {
         // Remove existing influence layer if any
         layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
         
-        // For the cell where the magnet would be placed, show its own strength (3)
-        let displayIntensity = intensity
-        
         // Create influence layer if needed
-        if displayIntensity > 0 {
+        if intensity > 0 {
             let influenceLayer = CALayer()
             influenceLayer.frame = bounds
             influenceLayer.name = "influenceLayer"
             
-            // Set color based on magnet type and intensity (0-3) - lower opacity
-            let alpha = CGFloat(displayIntensity) * 0.05 + 0.05
+            // Set color based on magnet type and intensity - show for ALL cells
+            let alpha = CGFloat(intensity) * 0.05 + 0.05
             
             if magnetType == 1 {
                 influenceLayer.backgroundColor = UIColor.red.withAlphaComponent(alpha).cgColor
@@ -454,8 +450,8 @@ class CellView: UIView {
             
             layer.insertSublayer(influenceLayer, at: 0)  // Insert at bottom
             
-            // Show numerical impact if this is a target cell or if we're showing hints
-            if cell.initialCharge != 0 || showHints {
+            // Show numerical impact ONLY for cells with initial charge
+            if cell.initialCharge != 0 {
                 // Calculate the influence value
                 let influenceValue = intensity * magnetType
                 
@@ -482,10 +478,61 @@ class CellView: UIView {
             }
         }
     }
+
+    func showCentralMagnetInfluence(magnetType: Int) {
+        // This special method shows the ±3 influence for the central cell
+        // even when it's selected
+        
+        // Remove existing influence layer if any
+        layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
+        
+        // Create influence layer
+        let influenceLayer = CALayer()
+        influenceLayer.frame = bounds
+        influenceLayer.name = "influenceLayer"
+        
+        // Set color based on magnet type
+        let alpha = 0.2  // Stronger alpha for the central cell
+        
+        if magnetType == 1 {
+            influenceLayer.backgroundColor = UIColor.red.withAlphaComponent(alpha).cgColor
+            influenceLayer.borderColor = UIColor.red.withAlphaComponent(alpha * 2).cgColor
+            influenceLayer.borderWidth = 1
+        } else if magnetType == -1 {
+            influenceLayer.backgroundColor = UIColor.blue.withAlphaComponent(alpha).cgColor
+            influenceLayer.borderColor = UIColor.blue.withAlphaComponent(alpha * 2).cgColor
+            influenceLayer.borderWidth = 1
+        }
+        
+        layer.insertSublayer(influenceLayer, at: 0)
+        
+        // Add a label showing the ±3 value
+        let valueLayer = CATextLayer()
+        let value = 3 * magnetType
+        let sign = value > 0 ? "+" : ""
+        valueLayer.string = "\(sign)\(value)"
+        valueLayer.fontSize = 14
+        valueLayer.alignmentMode = .center
+        valueLayer.foregroundColor = magnetType > 0 ? UIColor.red.cgColor : UIColor.blue.cgColor
+        valueLayer.backgroundColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        valueLayer.cornerRadius = 4
+        valueLayer.contentsScale = UIScreen.main.scale
+        
+        // Position in the center
+        valueLayer.frame = CGRect(
+            x: (bounds.width - 30) / 2,
+            y: (bounds.height - 20) / 2,
+            width: 30,
+            height: 20
+        )
+        
+        influenceLayer.addSublayer(valueLayer)
+    }
+
     
-    // Clear influence preview
     func clearInfluence() {
         layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
+        previewValue = nil
     }
 }
 
@@ -529,7 +576,7 @@ class MessageView: UIView {
 // A view for magnet selection buttons with improved design
 class MagnetButton: UIButton {
     // Properties
-    var magnetType: Int = 0
+    var toolType: Int = 0
     var count: Int?
     
     // UI elements
@@ -580,7 +627,7 @@ class MagnetButton: UIButton {
     
     // Configure the button for a specific magnet type
     func configure(type: Int, count: Int? = nil, isSelected: Bool) {
-        self.magnetType = type
+        self.toolType = type
         self.count = count
         
         // Set background color based on type

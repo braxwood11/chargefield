@@ -13,8 +13,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
 
+    // In AppDelegate.swift
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Create a window of the same size as the screen
+        window = UIWindow(frame: UIScreen.main.bounds)
+        
+        // Create the title screen as the initial view controller
+        let titleVC = TitleViewController()
+        
+        // Wrap it in a navigation controller to enable proper navigation between screens
+        let navigationController = UINavigationController(rootViewController: titleVC)
+        
+        // Set the navigation controller as the root of the window
+        window?.rootViewController = navigationController
+        window?.makeKeyAndVisible()
+        
         return true
     }
 

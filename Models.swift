@@ -12,7 +12,7 @@ import Foundation
 // Represents a cell on the grid
 struct MagnetCell {
     // -1 for negative, 0 for none, 1 for positive
-    var magnetValue: Int = 0
+    var toolEffect: Int = 0
     // Initial charge to be neutralized (non-zero means this is a target cell)
     var initialCharge: Int = 0
     // Current calculated field value
@@ -141,6 +141,35 @@ struct PuzzleDefinition {
             difficulty: difficulty,
             positiveMagnets: positiveMagnets,
             negativeMagnets: negativeMagnets
+        )
+    }
+}
+
+extension PuzzleDefinition {
+    static func tutorialPuzzle() -> PuzzleDefinition {
+        let gridSize = 3
+        
+        // Very simple puzzle for tutorial
+        let targetValues = [
+            [-3, 0, 0],
+            [0, 0, 0],
+            [0, 0, 3]
+        ]
+        
+        // The solution
+        let solution = [
+            [-1, 0, 0],
+            [0, 0, 0],
+            [0, 0, 1]
+        ]
+        
+        return PuzzleDefinition(
+            gridSize: gridSize,
+            initialCharges: targetValues,
+            solution: solution,
+            placeableGrid: nil,
+            positiveMagnets: 1,
+            negativeMagnets: 1
         )
     }
 }

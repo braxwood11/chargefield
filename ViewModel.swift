@@ -57,7 +57,7 @@ class GameViewModel {
         // For each magnet, calculate its influence on all cells
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                let magnetValue = gameState.grid[row][col].magnetValue
+                let magnetValue = gameState.grid[row][col].toolEffect
                 if magnetValue != 0 {
                     // Add the magnet's own value to its cell
                     fieldValues[row][col] += magnetValue * 3  // Strength at its own position
@@ -161,7 +161,7 @@ class GameViewModel {
         guard gameState.grid[row][col].placeable else { return }
         guard !gameState.puzzleSolved || gameState.showSolution else { return }
         
-        let currentValue = gameState.grid[row][col].magnetValue
+        let currentValue = gameState.grid[row][col].toolEffect
         
         // If eraser is selected, remove any magnet
         if gameState.selectedMagnetType == 0 && currentValue != 0 {
@@ -170,7 +170,7 @@ class GameViewModel {
             } else if currentValue == -1 {
                 gameState.availableMagnets.negative += 1
             }
-            gameState.grid[row][col].magnetValue = 0
+            gameState.grid[row][col].toolEffect = 0
         }
         // If positive magnet is selected
         else if gameState.selectedMagnetType == 1 && currentValue != 1 {
@@ -183,7 +183,7 @@ class GameViewModel {
             }
             
             gameState.availableMagnets.positive -= 1
-            gameState.grid[row][col].magnetValue = 1
+            gameState.grid[row][col].toolEffect = 1
         }
         // If negative magnet is selected
         else if gameState.selectedMagnetType == -1 && currentValue != -1 {
@@ -196,7 +196,7 @@ class GameViewModel {
             }
             
             gameState.availableMagnets.negative -= 1
-            gameState.grid[row][col].magnetValue = -1
+            gameState.grid[row][col].toolEffect = -1
         }
         
         // Clear selection after placement (important!)
@@ -211,7 +211,7 @@ class GameViewModel {
         // Reset magnets
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                gameState.grid[row][col].magnetValue = 0
+                gameState.grid[row][col].toolEffect = 0
                 gameState.grid[row][col].isSelected = false
                 // Reset current field value to initial charge
                 gameState.grid[row][col].currentFieldValue = gameState.grid[row][col].initialCharge
@@ -238,7 +238,7 @@ class GameViewModel {
                     if row < gameState.solution.count && col < gameState.solution[row].count {
                         // Invert the magnet value from the solution
                         let invertedMagnetValue = -gameState.solution[row][col]
-                        gameState.grid[row][col].magnetValue = invertedMagnetValue
+                        gameState.grid[row][col].toolEffect = invertedMagnetValue
                     }
                 }
             }
@@ -289,7 +289,6 @@ class GameViewModel {
         return influence
     }
     
-    // Calculate intensity of influence at a specific position
     func getInfluenceIntensity(from sourceRow: Int, sourceCol: Int, to targetRow: Int, targetCol: Int) -> Int {
         // Calculate Manhattan distance
         let rowDistance = abs(targetRow - sourceRow)
@@ -300,7 +299,7 @@ class GameViewModel {
             let distance = max(rowDistance, colDistance)
             
             if distance == 0 {
-                return 3 // Own cell
+                return 3 // Own cell - this is crucial
             } else if distance == 1 {
                 return 2 // Adjacent cell
             } else if distance == 2 {

@@ -12,6 +12,26 @@ class GameViewController: UIViewController, GameStateDelegate {
     // MARK: - Properties
     
     private var viewModel: GameViewModel!
+    var tutorialCompleted = false
+    private var tutorialManager: TutorialManager?
+    private var tutorialOverlay: TutorialOverlayView?
+    
+    // Default initializer
+       init() {
+           super.init(nibName: nil, bundle: nil)
+       }
+       
+       // Custom initializer with viewModel
+       init(viewModel: GameViewModel) {
+           self.viewModel = viewModel
+           super.init(nibName: nil, bundle: nil)
+           self.viewModel.delegate = self
+       }
+       
+       required init?(coder: NSCoder) {
+           super.init(coder: coder)
+       }
+    
     private var cellViews: [[CellView]] = []
     private var gridView: UIView!
     
@@ -27,6 +47,8 @@ class GameViewController: UIViewController, GameStateDelegate {
     
     private var progressBar: UIProgressView!
     private var progressLabel: UILabel!
+    
+    var isLaunchedFromDashboard = false
     
     // MARK: - Lifecycle Methods
     
@@ -46,21 +68,51 @@ class GameViewController: UIViewController, GameStateDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // Force a UI update after a slight delay to ensure everything is loaded
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.updateCellViews()
-            }
-        
-        // Initialize with the Z pattern puzzle
-        viewModel = GameViewModel(puzzle: .zPatternPuzzle())
-        viewModel.delegate = self
-        
+        // Setup the UI elements first, without updating their state
         setupUI()
+        
+        // If viewModel is already set, configure it
+        if viewModel != nil {
+            viewModel.delegate = self
+            updateUI() // This calls updateMagnetButtons()
+            
+            // Add tutorial setup at the end if launched from dashboard
+            if isLaunchedFromDashboard {
+                setupTutorial()
+            }
+        }
+        // If launched from dashboard, we'll handle this differently
+        else if isLaunchedFromDashboard {
+            // Don't try to update UI yet - wait for viewModel to be set
+        }
+        // Original flow - initialize with default puzzle
+        else {
+            viewModel = GameViewModel(puzzle: .zPatternPuzzle())
+            viewModel.delegate = self
+            updateUI()
+        }
         
         // Add tap gesture to the main view to detect taps outside the grid
         let backgroundTapGesture = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
         backgroundTapGesture.cancelsTouchesInView = false  // Allow taps to pass through to subviews
         view.addGestureRecognizer(backgroundTapGesture)
+    }
+
+    func setViewModel(_ newViewModel: GameViewModel) {
+        self.viewModel = newViewModel
+        
+        // Set the delegate
+        self.viewModel.delegate = self
+        
+        // Only update UI if the view is loaded and buttons are initialized
+        if isViewLoaded && positiveButton != nil && negativeButton != nil {
+            updateUI()
+            
+            // Setup tutorial if this is the tutorial level and launched from dashboard
+            if isLaunchedFromDashboard && newViewModel.gameState.grid.count == 3 {
+                setupTutorial()
+            }
+        }
     }
     
     // MARK: - UI Setup
@@ -70,7 +122,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         
         // Create title
         let titleLabel = UILabel()
-        titleLabel.text = "ChargeField"
+        titleLabel.text = "Containment Chamber"
         titleLabel.font = UIFont.boldSystemFont(ofSize: 32)
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -227,7 +279,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
         resetButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(resetButton)
-        
+        /*
         // New Puzzle button
         let newPuzzleButton = UIButton(type: .system)
         newPuzzleButton.setTitle("New Puzzle", for: .normal)
@@ -244,7 +296,9 @@ class GameViewController: UIViewController, GameStateDelegate {
             newPuzzleButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             newPuzzleButton.widthAnchor.constraint(equalToConstant: 160),
             newPuzzleButton.heightAnchor.constraint(equalToConstant: 44)
+         
         ])
+         */
     }
     
     /*
@@ -275,7 +329,127 @@ class GameViewController: UIViewController, GameStateDelegate {
         ])
     }
     */
+    
+    // MARK: - Tutorial Handlers
+    
+    private func setupTutorial() {
+        // Only setup tutorial for the tutorial level
+        guard isLaunchedFromDashboard,
+              viewModel.gameState.grid.count == 3 else { // Assuming 3x3 for tutorial
+            return
+        }
+        
+        tutorialManager = TutorialManager()
+        tutorialManager?.accessProvider = self
+        tutorialManager?.gameViewController = self
+        
+        tutorialOverlay = TutorialOverlayView(frame: view.bounds)
+        if let tutorialOverlay = tutorialOverlay {
+            tutorialOverlay.setNextButtonAction(self, action: #selector(advanceTutorial))
+            view.addSubview(tutorialOverlay)
+            updateTutorialState()
+        }
+    }
+
+    @objc private func advanceTutorial() {
+        tutorialManager?.advanceToNextStep()
+        updateTutorialState()
+    }
+
+    private func updateTutorialState() {
+        guard let tutorialManager = tutorialManager,
+              let tutorialOverlay = tutorialOverlay else { return }
+        
+        // Update instruction text
+        tutorialOverlay.setInstructionText(tutorialManager.getInstructionText())
+        
+        // Show next button only for steps that don't require action
+        tutorialOverlay.showNextButton(!tutorialManager.requiresAction())
+        
+        // Handle overlay visibility based on step
+        if tutorialManager.currentStep == .completeTask {
+            // During completion step:
+            // 1. Make the overlay completely transparent except for instructions
+            tutorialOverlay.backgroundColor = UIColor.clear
+            
+            // 2. Clear any highlights
+            tutorialOverlay.clearHighlight()
+            
+            // 3. Position instruction text at the top of the screen to stay out of the way
+            tutorialOverlay.positionInstructionsAtTop()
+            
+            // 4. Allow all interactions
+            tutorialOverlay.allowFullInteraction = true
+        } else {
+            // For other steps, show normal overlay with highlighting
+            tutorialOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+            tutorialOverlay.clearHighlight()
+            tutorialOverlay.resetInstructionPosition()
+            tutorialOverlay.allowFullInteraction = false
+            
+            // Highlight the current element of interest
+            if let elementToHighlight = tutorialManager.getHighlightedElement() as? UIView {
+                tutorialOverlay.highlightElement(elementToHighlight)
+            }
+        }
+        
+        // Handle tutorial completion
+        if tutorialManager.currentStep == .finished {
+            tutorialCompleted = true
+            
+            UIView.animate(withDuration: 0.5, animations: {
+                tutorialOverlay.alpha = 0
+            }) { _ in
+                tutorialOverlay.removeFromSuperview()
+                self.tutorialManager = nil
+                self.tutorialOverlay = nil
+                
+                self.showTutorialCompletionMessage()
+            }
+        }
+    }
+
+    private func showTutorialCompletionMessage() {
+        let alert = UIAlertController(
+            title: "Training Complete!",
+            message: "Great job! You've neutralized those pesky energy anomalies. Check your dashboard for your next assignment.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Return to dashboard", style: .default) { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
     // MARK: - Action Handlers
+    
+    @objc private func returnToDashboard() {
+            // Show completion dialog if puzzle is solved
+            if viewModel.gameState.puzzleSolved {
+                showCompletionDialog()
+            } else {
+                // Just go back without showing dialog
+                navigationController?.popViewController(animated: true)
+            }
+        }
+    
+    private func showCompletionDialog() {
+            // Create a simple completion dialog
+            let alert = UIAlertController(
+                title: "Assignment Complete",
+                message: "You've successfully processed this assignment. Return to headquarters?",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Return", style: .default) { [weak self] _ in
+                self?.navigationController?.popViewController(animated: true)
+            })
+            
+            present(alert, animated: true)
+        }
+        
     
     @objc private func cellTapped(_ gesture: UITapGestureRecognizer) {
         guard let cellView = gesture.view as? CellView else { return }
@@ -284,31 +458,70 @@ class GameViewController: UIViewController, GameStateDelegate {
         let row = cellView.tag / 100
         let col = cellView.tag % 100
         
-        // If the cell already has a magnet, remove it (double-tap behavior)
-        if viewModel.gameState.grid[row][col].magnetValue != 0 {
-            // Call a method to just remove the magnet
-            removeMagnet(at: row, col: col)
+        // Only restrict interaction during specific tutorial steps
+        if let tutorialManager = tutorialManager,
+           tutorialManager.currentStep != .completeTask {
+            if tutorialManager.currentStep == .tapCellToPreview {
+                if row == 0 && col == 0 {
+                    viewModel.selectCell(at: row, col: col)
+                    showInfluencePreview(row: row, col: col)
+                    advanceTutorial()
+                }
+                return
+            } else if tutorialManager.currentStep == .tapAgainToPlace {
+                if row == 0 && col == 0 && viewModel.gameState.grid[row][col].isSelected {
+                    viewModel.placeOrRemoveMagnet(at: row, col: col)
+                    clearAllInfluencePreviews()
+                    advanceTutorial()
+                }
+                return
+            } else {
+                // Block interaction for other tutorial steps
+                return
+            }
+        }
+        
+        // Direct removal approach - if the cell has a magnet and we're tapping directly on it
+        if viewModel.gameState.grid[row][col].toolEffect != 0 {
+            // Direct tap on a magnet - remove it
+            if viewModel.gameState.grid[row][col].toolEffect == 1 {
+                viewModel.gameState.availableMagnets.positive += 1
+            } else if viewModel.gameState.grid[row][col].toolEffect == -1 {
+                viewModel.gameState.availableMagnets.negative += 1
+            }
+            
+            // Clear the magnet value
+            viewModel.gameState.grid[row][col].toolEffect = 0
+            
+            // Update the field
+            viewModel.updateFieldValues()
+            
+            // Clear any selections and previews
+            clearAllInfluencePreviews()
+            viewModel.clearAllSelections()
+            
             return
         }
         
-        // Check if cell is already selected
+        // Regular placement flow - first select, then place
         if viewModel.gameState.grid[row][col].isSelected {
-            // Second tap - place the magnet
             viewModel.placeOrRemoveMagnet(at: row, col: col)
-            
-            // Clear all influence previews
             clearAllInfluencePreviews()
         } else {
-            // First tap - select the cell
             viewModel.selectCell(at: row, col: col)
-            
-            // Show influence preview
             showInfluencePreview(row: row, col: col)
+        }
+        
+        // Check if puzzle is solved during tutorial
+        if let tutorialManager = tutorialManager,
+           tutorialManager.currentStep == .completeTask &&
+           viewModel.gameState.puzzleSolved {
+            advanceTutorial()
         }
     }
     
     private func removeMagnet(at row: Int, col: Int) {
-        let currentValue = viewModel.gameState.grid[row][col].magnetValue
+        let currentValue = viewModel.gameState.grid[row][col].toolEffect
         
         // Return the magnet to available magnets
         if currentValue == 1 {
@@ -318,7 +531,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         }
         
         // Remove the magnet
-        viewModel.gameState.grid[row][col].magnetValue = 0
+        viewModel.gameState.grid[row][col].toolEffect = 0
         
         // Clear any selection
         viewModel.gameState.grid[row][col].isSelected = false
@@ -449,7 +662,6 @@ class GameViewController: UIViewController, GameStateDelegate {
         viewModel.clearAllSelections()
     }
     
-    // Show influence preview for the selected cell
     private func showInfluencePreview(row: Int, col: Int) {
         // Clear previous previews
         clearAllInfluencePreviews()
@@ -458,13 +670,19 @@ class GameViewController: UIViewController, GameStateDelegate {
         let influenceArea = viewModel.getInfluenceArea(for: row, col: col)
         let magnetType = viewModel.gameState.selectedMagnetType
         
-        // Skip if eraser is selected
-        if magnetType == 0 {
-            return
+        // First, specially handle the central cell to show ±3
+        if row < cellViews.count && col < cellViews[row].count {
+            cellViews[row][col].showCentralMagnetInfluence(magnetType: magnetType)
         }
         
+        // Then handle all other cells in the influence area
         for r in 0..<influenceArea.count {
             for c in 0..<influenceArea[r].count {
+                // Skip the central cell as we've already handled it
+                if r == row && c == col {
+                    continue
+                }
+                
                 if influenceArea[r][c] {
                     // Calculate influence intensity based on distance
                     let intensity = viewModel.getInfluenceIntensity(from: row, sourceCol: col, to: r, targetCol: c)
@@ -488,15 +706,45 @@ class GameViewController: UIViewController, GameStateDelegate {
     }
     
     @objc private func magnetButtonTapped(_ sender: MagnetButton) {
-        // Set the selected magnet type
-        viewModel.gameState.selectedMagnetType = sender.magnetType
+        // Check tutorial state first
+        if let tutorialManager = tutorialManager {
+            switch tutorialManager.currentStep {
+            case .selectStabilizer:
+                if sender.toolType == 1 {
+                    // Only allow selecting the stabilizer during this step
+                    viewModel.gameState.selectedMagnetType = sender.toolType
+                    updateMagnetButtons()
+                    updateCellViews()
+                    advanceTutorial()
+                }
+                return
+                
+            case .explainSuppressor:
+                if sender.toolType == -1 {
+                    // Only allow selecting the suppressor during this step
+                    viewModel.gameState.selectedMagnetType = sender.toolType
+                    updateMagnetButtons()
+                    updateCellViews()
+                    advanceTutorial()
+                }
+                return
+                
+            case .completeTask:
+                // Allow normal interaction during the "complete task" step
+                // Fall through to the normal logic
+                break
+                
+            default:
+                // For other steps, block interaction with magnet buttons
+                return
+            }
+        }
         
-        // Update button appearance
-        positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
-        negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
-        
-        // Update cell views
+        // Normal magnet button interaction logic
+        viewModel.gameState.selectedMagnetType = sender.toolType
+        updateMagnetButtons()
         updateCellViews()
+        
     }
     
     @objc private func resetButtonTapped() {
@@ -598,6 +846,13 @@ class GameViewController: UIViewController, GameStateDelegate {
     
     func gameStateDidChange() {
         updateUI()
+        
+        // Check if puzzle is complete during tutorial
+        if let tutorialManager = tutorialManager,
+           tutorialManager.currentStep == .completeTask &&
+           viewModel.gameState.puzzleSolved {
+            advanceTutorial()
+        }
     }
     
     func puzzleSolved() {
@@ -618,6 +873,32 @@ class GameViewController: UIViewController, GameStateDelegate {
 
 // MARK: - Extension for any additional functionality
 
-extension GameViewController {
-    // Any additional helper methods can go here
+// Add this protocol
+protocol TutorialAccessible: AnyObject {
+    func getStabilizerButton() -> UIView?
+    func getSuppressorButton() -> UIView?
+    func getGridView() -> UIView?
+    func getCellView(at row: Int, col: Int) -> UIView?
+}
+
+// Make GameViewController implement the protocol
+extension GameViewController: TutorialAccessible {
+    func getStabilizerButton() -> UIView? {
+        return positiveButton
+    }
+    
+    func getGridView() -> UIView? {
+        return gridView
+    }
+    
+    func getSuppressorButton() -> UIView? {
+        return negativeButton
+    }
+    
+    func getCellView(at row: Int, col: Int) -> UIView? {
+        if row < cellViews.count && col < cellViews[row].count {
+            return cellViews[row][col]
+        }
+        return nil
+    }
 }
