@@ -72,6 +72,44 @@ class TutorialOverlayView: UIView {
         nextButton.addTarget(target, action: action, for: .touchUpInside)
     }
     
+    func highlightMultipleElements(_ elements: [UIView?]) {
+        // Clear any existing highlights
+        clearHighlight()
+        
+        // Create a path for all elements
+        let path = UIBezierPath(rect: bounds)
+        
+        // Add each non-nil element to the highlight
+        for element in elements.compactMap({ $0 }) {
+            if let window = element.window, let elementSuperview = element.superview {
+                let frameInWindow = elementSuperview.convert(element.frame, to: window)
+                let frameInSelf = convert(frameInWindow, from: window)
+                
+                // Append this element's frame to the path
+                path.append(UIBezierPath(roundedRect: frameInSelf, cornerRadius: element.layer.cornerRadius))
+                
+                // Create highlight border around the element
+                let highlightBorder = UIView()
+                highlightBorder.layer.borderColor = UIColor.yellow.cgColor
+                highlightBorder.layer.borderWidth = 3
+                highlightBorder.layer.cornerRadius = 8
+                highlightBorder.clipsToBounds = true
+                highlightBorder.frame = frameInSelf.insetBy(dx: -5, dy: -5)
+                highlightBorder.backgroundColor = UIColor.clear
+                highlightBorder.tag = 99999 // Use a tag to identify these views for removal
+                highlightBorder.isUserInteractionEnabled = false
+                addSubview(highlightBorder)
+            }
+        }
+        
+        // Create the mask layer
+        let maskLayer = CAShapeLayer()
+        maskLayer.fillRule = .evenOdd
+        maskLayer.path = path.cgPath
+        
+        layer.mask = maskLayer
+    }
+    
     func highlightElement(_ element: UIView) {
             // Convert the element's frame to this view's coordinate system
             if let window = element.window, let elementSuperview = element.superview {
@@ -105,10 +143,13 @@ class TutorialOverlayView: UIView {
     }
     
     func clearHighlight() {
-            layer.mask = nil
-            highlightView.isHidden = true
-            highlightedFrame = nil
-        }
+        layer.mask = nil
+        highlightView.isHidden = true
+        highlightedFrame = nil
+        
+        // Remove any additional highlight borders
+        subviews.filter { $0.tag == 99999 }.forEach { $0.removeFromSuperview() }
+    }
     
     func positionInstructionsAtTop() {
         // Remove existing constraints

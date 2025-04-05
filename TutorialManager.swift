@@ -15,6 +15,7 @@ class TutorialManager {
         case selectStabilizer
         case tapCellToPreview
         case tapAgainToPlace
+        case explainNeutralization
         case explainSuppressor
         case completeTask
         case finished
@@ -30,9 +31,13 @@ class TutorialManager {
             switch currentStep {
             case .explainGrid:
                 return accessProvider?.getGridView()
+            case .explainTargetValues:
+                return [accessProvider?.getCellView(at: 0, col: 0), accessProvider?.getCellView(at: 2, col: 2)]
             case .selectStabilizer:
                 return accessProvider?.getStabilizerButton()
             case .tapCellToPreview, .tapAgainToPlace:
+                return accessProvider?.getCellView(at: 0, col: 0)
+            case .explainNeutralization:
                 return accessProvider?.getCellView(at: 0, col: 0)
             case .explainSuppressor:
                 return accessProvider?.getSuppressorButton()
@@ -46,7 +51,7 @@ class TutorialManager {
         case .selectStabilizer, .tapCellToPreview, .tapAgainToPlace,
              .explainSuppressor, .completeTask:
             return true
-        case .welcome, .explainGrid, .explainTargetValues, .finished:
+        case .welcome, .explainGrid, .explainTargetValues, .explainNeutralization, .finished:
             return false
         }
     }
@@ -65,6 +70,8 @@ class TutorialManager {
             return "Now tap on the top-left cell to see how it would affect the field."
         case .tapAgainToPlace:
             return "Tap the cell again to place the stabilizer."
+        case .explainNeutralization:
+            return "Great! The cell is now neutralized. Notice the green highlight indicating the field is balanced to zero."
         case .explainSuppressor:
             return "Now select the Suppressor (-) tool to decrease field values."
         case .completeTask:

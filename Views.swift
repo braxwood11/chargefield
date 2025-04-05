@@ -650,8 +650,33 @@ class MagnetButton: UIButton {
             countLabel.isHidden = true
         }
         
-        // Show selection border
-        layer.borderWidth = isSelected ? 3 : 0
-        layer.borderColor = UIColor.white.cgColor
+        // Show selection with a more visible highlight
+        if isSelected {
+            // Increase border width for more visibility
+            layer.borderWidth = 4
+            
+            // Choose a color based on the magnet type for better contrast
+            if type == 1 {
+                // For red positive magnet, use a bright yellow border
+                layer.borderColor = UIColor.yellow.cgColor
+            } else if type == -1 {
+                // For blue negative magnet, use a bright yellow or lime border
+                layer.borderColor = UIColor.yellow.cgColor
+            } else {
+                // For neutral/eraser, use a bright orange border
+                layer.borderColor = UIColor.orange.cgColor
+            }
+            
+            // Optional: Add a subtle glow effect
+            layer.shadowColor = UIColor.yellow.cgColor
+            layer.shadowOffset = CGSize.zero
+            layer.shadowRadius = 8
+            layer.shadowOpacity = 0.6
+        } else {
+            // Reset border and shadow when not selected
+            layer.borderWidth = 0
+            layer.borderColor = nil
+            layer.shadowOpacity = 0
+        }
     }
 }

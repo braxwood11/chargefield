@@ -388,8 +388,14 @@ class GameViewController: UIViewController, GameStateDelegate {
             tutorialOverlay.allowFullInteraction = false
             
             // Highlight the current element of interest
-            if let elementToHighlight = tutorialManager.getHighlightedElement() as? UIView {
-                tutorialOverlay.highlightElement(elementToHighlight)
+            let highlightedElement = tutorialManager.getHighlightedElement()
+            
+            if let elements = highlightedElement as? [UIView?] {
+                // If we got an array of views, use the multiple highlight method
+                tutorialOverlay.highlightMultipleElements(elements)
+            } else if let singleElement = highlightedElement as? UIView {
+                // If we got a single view, use the original method
+                tutorialOverlay.highlightElement(singleElement)
             }
         }
         
