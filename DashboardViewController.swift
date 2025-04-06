@@ -96,7 +96,7 @@ class DashboardViewController: UIViewController {
         
         // Tutorial button
         let tutorialButton = createAssignmentButton(
-            title: "NeutraTech Orientation Training",
+            title: "NeutraTech Orientation #1",
             subtitle: "Required for Field Operations",
             icon: "graduationcap.fill",
             tag: 0,
@@ -106,13 +106,13 @@ class DashboardViewController: UIViewController {
         
         // Level 1 button
         let level1Button = createAssignmentButton(
-            title: "Assignment #1",
-            subtitle: "Field Neutralization Protocol",
+            title: "Random Assignment",
+            subtitle: "Field Neutralization Challenge",
             icon: "atom",
             tag: 1,
             color: tutorialCompleted ? UIColor.systemBlue.withAlphaComponent(0.8) : UIColor.systemGray.withAlphaComponent(0.8)
         )
-        level1Button.isEnabled = tutorialCompleted
+        level1Button.isEnabled = true
         view.addSubview(level1Button)
         
         // Level 2 button (locked initially)
@@ -425,8 +425,17 @@ class DashboardViewController: UIViewController {
             // Tutorial level setup
             gameVC.setViewModel(GameViewModel(puzzle: .tutorialPuzzle()))
         } else if levelTag == 1 {
-            // Level 1 setup
-            gameVC.setViewModel(GameViewModel(puzzle: .zPatternPuzzle()))
+            let difficulties = ["easy", "medium", "hard"]
+            let randomDifficulty = difficulties.randomElement() ?? "medium"
+            let gridSize = Bool.random() ? 4 : 5  // Randomly choose between 4x4 and 5x5
+
+            let randomPuzzle = PuzzleDefinition.generateRandomPuzzle(
+                gridSize: gridSize,
+                difficulty: randomDifficulty,
+                positiveMagnets: randomDifficulty == "easy" ? 2 : 3,
+                negativeMagnets: randomDifficulty == "easy" ? 2 : 3
+            )
+            gameVC.setViewModel(GameViewModel(puzzle: randomPuzzle))
         }
         
         // Set a flag to indicate this is being launched from the new flow

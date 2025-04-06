@@ -71,7 +71,7 @@ class CellView: UIView {
         addSubview(neutralizedIndicator)
         
         // Charge label background for better visibility
-        chargeBackground.backgroundColor = UIColor.white.withAlphaComponent(0.7)
+        chargeBackground.backgroundColor = UIColor.white.withAlphaComponent(0.8)
         chargeBackground.layer.cornerRadius = 8
         addSubview(chargeBackground)
         
@@ -138,25 +138,19 @@ class CellView: UIView {
     }
     
     // Update the appearance based on cell data
-    func updateAppearance() {
+    private func updateAppearance() {
         guard let cell = cell else { return }
-        
-        // Adjust font sizes based on cell size
-        let isSmallCell = bounds.width < 60 // For 5x5 grid
-        chargeLabel.font = UIFont.boldSystemFont(ofSize: isSmallCell ? 10 : 14)
-        magnetSymbol.font = UIFont.boldSystemFont(ofSize: isSmallCell ? 14 : 16)
         
         // Update charge label based on current field value
         chargeLabel.text = "\(cell.currentFieldValue)"
         
-        // Set charge label color based on charge sign
+        // Set charge label color with much brighter colors
         if cell.currentFieldValue < 0 {
-            chargeLabel.textColor = .blue
+            chargeLabel.textColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0) // Very bright blue
         } else if cell.currentFieldValue > 0 {
-            chargeLabel.textColor = .red
+            chargeLabel.textColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0) // Very bright red
         } else {
-            // Zero value - black text
-            chargeLabel.textColor = .black
+            chargeLabel.textColor = UIColor.green // Match terminal theme
         }
         
         // Show charge label and background only for target cells or when hints are on
@@ -164,18 +158,25 @@ class CellView: UIView {
         chargeLabel.isHidden = !isTargetCell && !showHints
         chargeBackground.isHidden = !isTargetCell && !showHints
         
+        // Make charge background more transparent so colors are more visible
+        chargeBackground.backgroundColor = UIColor.white.withAlphaComponent(0.5)
+        
         // Update border for selection
         layer.borderWidth = cell.isSelected ? 2 : 1
-        layer.borderColor = cell.isSelected ? UIColor.black.cgColor : UIColor.lightGray.cgColor
+        layer.borderColor = cell.isSelected ? UIColor.green.cgColor : UIColor.green.withAlphaComponent(0.5).cgColor
         
-        // Show magnet if present
+        // Show magnet if present with much brighter colors
         if cell.toolEffect != 0 {
-            magnetView.isHidden = false
-            magnetView.backgroundColor = cell.toolEffect > 0 ? .red : .blue
-            magnetSymbol.text = cell.toolEffect > 0 ? "+" : "-"
-        } else {
-            magnetView.isHidden = true
-        }
+                magnetView.isHidden = false
+                if cell.toolEffect > 0 {
+                    magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0) // Deeper red
+                } else {
+                    magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0) // Deeper blue
+                }
+                magnetSymbol.text = cell.toolEffect > 0 ? "+" : "-"
+            } else {
+                magnetView.isHidden = true
+            }
         
         // Update neutralization status
         updateNeutralizationStatus()
@@ -305,19 +306,25 @@ class CellView: UIView {
     private func displayNeutralizationProgress() {
         guard let cell = cell else { return }
         
-        // Calculate progress percentage (0.0 to 1.0)
+        // Calculate progress percentage
         let initialAbsValue = abs(cell.initialCharge)
         let currentAbsValue = abs(cell.currentFieldValue)
         let progressPercentage = initialAbsValue > 0 ? 1.0 - (Double(currentAbsValue) / Double(initialAbsValue)) : 0.0
         
-        // Determine base color based on original charge sign
-        let baseColor: UIColor = cell.initialCharge < 0 ? .blue : .red
+        // Use brighter base colors
+        let baseColor: UIColor = cell.initialCharge < 0 ?
+            UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1.0) : // Bright blue
+            UIColor(red: 1.0, green: 0.4, blue: 0.4, alpha: 1.0)   // Bright red
+        
         let progressColor = UIColor.green.withAlphaComponent(0.4)
         
-        // Base layer (colored by charge sign) with reduced opacity
+        // Use lighter cell background to let colors stand out
+        backgroundColor = .white // Match terminal theme
+        
+        // Base layer with reduced opacity to make colors more visible
         let baseLayer = CALayer()
         baseLayer.frame = fillBarView.bounds
-        baseLayer.backgroundColor = baseColor.withAlphaComponent(0.15).cgColor
+        baseLayer.backgroundColor = baseColor.withAlphaComponent(0.3).cgColor // More visible
         fillBarView.layer.addSublayer(baseLayer)
         
         // Progress layer (green progress toward neutralization)
@@ -630,66 +637,59 @@ class MagnetButton: UIButton {
         self.toolType = type
         self.count = count
         
-        // Set background color based on type
+        // Set background and text colors to match terminal theme
+            backgroundColor = .black
+        
+        // Set symbol
         if type == 1 {
-            backgroundColor = .red
-            symbolLabel.text = "+"
-        } else if type == -1 {
-            backgroundColor = .blue
-            symbolLabel.text = "−"  // Using unicode minus sign for better appearance
-        } else {
-            backgroundColor = UIColor.lightGray
-            symbolLabel.text = "✕"  // Using unicode multiplication sign for X
-        }
+                symbolLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Bright red
+                symbolLabel.text = "+"
+            } else if type == -1 {
+                symbolLabel.textColor = UIColor(red: 0.1, green: 0.6, blue: 1.0, alpha: 1.0) // Bright blue
+                symbolLabel.text = "−"  // Using unicode minus sign for better appearance
+            } else {
+                symbolLabel.textColor = .lightGray
+                symbolLabel.text = "✕"  // Using unicode multiplication sign for X
+            }
         
         // Set count text if available
         if let count = count {
             countLabel.text = "\(count) left"
+            countLabel.textColor = .green // Terminal theme
             countLabel.isHidden = false
         } else {
             countLabel.isHidden = true
         }
         
-        // Show selection with a more visible highlight
-        if isSelected {
-            // Increase border width for more visibility
-            layer.borderWidth = 4
-            
-            // Choose a color based on the magnet type for better contrast
-            if type == 1 {
-                // For red positive magnet, use a bright yellow border
-                layer.borderColor = UIColor.yellow.cgColor
-            } else if type == -1 {
-                // For blue negative magnet, use a bright yellow or lime border
-                layer.borderColor = UIColor.yellow.cgColor
+        // Show selection with terminal-style highlight
+            if isSelected {
+                // Increase border width for more visibility
+                layer.borderWidth = 3
+                layer.borderColor = UIColor.green.cgColor
+                
+                // Add a subtle glow effect
+                layer.shadowColor = UIColor.green.cgColor
+                layer.shadowOffset = CGSize.zero
+                layer.shadowRadius = 8
+                layer.shadowOpacity = 0.6
             } else {
-                // For neutral/eraser, use a bright orange border
-                layer.borderColor = UIColor.orange.cgColor
+                // Reset border when not selected
+                layer.borderWidth = 2
+                layer.borderColor = UIColor.green.withAlphaComponent(0.4).cgColor
+                layer.shadowOpacity = 0
             }
-            
-            // Optional: Add a subtle glow effect
-            layer.shadowColor = UIColor.yellow.cgColor
-            layer.shadowOffset = CGSize.zero
-            layer.shadowRadius = 8
-            layer.shadowOpacity = 0.6
-        } else {
-            // Reset border and shadow when not selected
-            layer.borderWidth = 0
-            layer.borderColor = nil
-            layer.shadowOpacity = 0
         }
-    }
 }
 
 // Add these extensions at the end of Views.swift
 extension CellView {
     func updateStyleForTerminalTheme() {
         // Update cell background to black
-        backgroundColor = .black
+        backgroundColor = .white
         
         // Update border
         layer.borderWidth = 1
-        layer.borderColor = UIColor.green.withAlphaComponent(0.5).cgColor
+        layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
         
         // Update label styles
         chargeLabel.font = UIFont.monospacedSystemFont(ofSize: chargeLabel.font.pointSize, weight: .bold)

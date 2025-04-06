@@ -15,6 +15,7 @@ class GameViewController: UIViewController, GameStateDelegate {
         var tutorialCompleted = false
         private var tutorialManager: TutorialManager?
         private var tutorialOverlay: TutorialOverlayView?
+        private var completionBanner: UIView?
         
         // Default initializer
         init() {
@@ -236,7 +237,7 @@ class GameViewController: UIViewController, GameStateDelegate {
            // Create grid lines
            let gridSize: CGFloat = 30
            let lineWidth: CGFloat = 0.5
-           let lineColor = UIColor.green.withAlphaComponent(0.2)
+           let lineColor = UIColor.black.withAlphaComponent(0.2)
            
            // Horizontal lines
            for y in stride(from: 0, to: view.bounds.height, by: gridSize) {
@@ -346,31 +347,41 @@ class GameViewController: UIViewController, GameStateDelegate {
        }
        
        private func setupMagnetButtons() {
-           // Positive magnet button
-           positiveButton = MagnetButton(frame: .zero)
-           positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
-           positiveButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
-           positiveButton.translatesAutoresizingMaskIntoConstraints = false
-           view.addSubview(positiveButton)
-           
-           // Negative magnet button
-           negativeButton = MagnetButton(frame: .zero)
-           negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
-           negativeButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
-           negativeButton.translatesAutoresizingMaskIntoConstraints = false
-           view.addSubview(negativeButton)
-           
-           // Style updates
-           positiveButton.layer.borderWidth = 2
-           positiveButton.layer.borderColor = UIColor.red.withAlphaComponent(0.5).cgColor
-           negativeButton.layer.borderWidth = 2
-           negativeButton.layer.borderColor = UIColor.blue.withAlphaComponent(0.5).cgColor
+           // Positive magnet button (stabilizer)
+               positiveButton = MagnetButton(frame: .zero)
+               positiveButton.translatesAutoresizingMaskIntoConstraints = false
+               view.addSubview(positiveButton)
+               
+               // Negative magnet button (suppressor)
+               negativeButton = MagnetButton(frame: .zero)
+               negativeButton.translatesAutoresizingMaskIntoConstraints = false
+               view.addSubview(negativeButton)
+               
+               // Terminal theme styling
+               positiveButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
+               negativeButton.addTarget(self, action: #selector(magnetButtonTapped(_:)), for: .touchUpInside)
+               
+               // Update the MagnetButton class to configure green terminal theme
+               updateMagnetButtonsStyle()
        }
+    
+    private func updateMagnetButtonsStyle() {
+        // Configure with terminal theme
+        positiveButton.configure(type: 1, count: viewModel.gameState.availableMagnets.positive, isSelected: viewModel.gameState.selectedMagnetType == 1)
+        negativeButton.configure(type: -1, count: viewModel.gameState.availableMagnets.negative, isSelected: viewModel.gameState.selectedMagnetType == -1)
+        
+        // Apply terminal styling
+        [positiveButton, negativeButton].forEach { button in
+            button.backgroundColor = .black
+            button.layer.borderWidth = 2
+            button.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+        }
+    }
        
        private func setupGrid() {
            // Create container for the grid
                gridView = UIView(frame: .zero)
-               gridView.backgroundColor = UIColor.black
+           gridView.backgroundColor = UIColor.white
                gridView.layer.cornerRadius = 8
                gridView.layer.borderWidth = 2
                gridView.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
@@ -388,17 +399,19 @@ class GameViewController: UIViewController, GameStateDelegate {
        }
        
        private func setupControlButtons() {
-           // Solution button - now a circular button with a different symbol and color
-           solutionButton = UIButton(type: .system)
-           solutionButton.backgroundColor = UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Purple color
-           solutionButton.setTitleColor(.white, for: .normal)
-           solutionButton.layer.cornerRadius = 30 // Make it circular
+           // Solution button - now terminal-themed
+               solutionButton = UIButton(type: .system)
+               solutionButton.backgroundColor = .black
+               solutionButton.layer.borderWidth = 2
+               solutionButton.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+               solutionButton.setTitleColor(.green, for: .normal)
+               solutionButton.layer.cornerRadius = 30 // Keep it circular
            
            // Use a hint/solution icon (puzzle piece)
            let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
            let solutionImage = UIImage(systemName: "puzzlepiece.fill", withConfiguration: configuration)
            solutionButton.setImage(solutionImage, for: .normal)
-           solutionButton.tintColor = .white
+           solutionButton.tintColor = .green
            
            solutionButton.addTarget(self, action: #selector(solutionButtonTapped), for: .touchUpInside)
            solutionButton.translatesAutoresizingMaskIntoConstraints = false
@@ -480,8 +493,12 @@ class GameViewController: UIViewController, GameStateDelegate {
         guard let tutorialManager = tutorialManager,
               let tutorialOverlay = tutorialOverlay else { return }
         
-        print("Updating tutorial state")
-            print("Current step: \(tutorialManager.currentStep)")
+        view.gestureRecognizers?.forEach { gesture in
+                gesture.cancelsTouchesInView = false
+                gesture.delaysTouchesBegan = false
+                gesture.delaysTouchesEnded = false
+            }
+        
         
         // Update instruction text
         tutorialOverlay.setInstructionText(tutorialManager.getInstructionText())
@@ -492,23 +509,30 @@ class GameViewController: UIViewController, GameStateDelegate {
         
         // Make the button more visible when shown
         if showNextButton {
-            tutorialOverlay.animateNextButton()
+            // Make the button more visible for debugging
+            tutorialOverlay.nextButton.backgroundColor = UIColor.green.withAlphaComponent(0.3)
+            
+            // Explicitly bring button to front
+            tutorialOverlay.bringSubviewToFront(tutorialOverlay.nextButton)
+            
+            // Print button details
+            print("Next button frame: \(tutorialOverlay.nextButton.frame)")
+            print("Button in view hierarchy: \(tutorialOverlay.nextButton.superview != nil)")
+            print("Button enabled: \(tutorialOverlay.nextButton.isEnabled)")
+            print("Button user interaction enabled: \(tutorialOverlay.nextButton.isUserInteractionEnabled)")
+            
+            // Try adding a direct tap recognizer as backup
+            let directTap = UITapGestureRecognizer(target: self, action: #selector(advanceTutorial))
+            tutorialOverlay.nextButton.addGestureRecognizer(directTap)
         }
         
         // Handle overlay visibility based on step
         if tutorialManager.currentStep == .completeTask {
-            // During completion step:
-            // 1. Make the overlay completely transparent except for instructions
-            tutorialOverlay.backgroundColor = UIColor.clear
-            
-            // 2. Clear any highlights
-            tutorialOverlay.clearHighlight()
-            
-            // 3. Position instruction text at the top of the screen to stay out of the way
-            tutorialOverlay.positionInstructionsAtTop()
-            
-            // 4. Allow all interactions
-            tutorialOverlay.allowFullInteraction = true
+            // Show the custom completion banner
+                showCompletionBanner()
+                
+                // Remove the overlay to allow full interaction
+                tutorialOverlay.isHidden = true
         } else {
             // For other steps, show normal overlay with highlighting
             tutorialOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.7)
@@ -539,10 +563,54 @@ class GameViewController: UIViewController, GameStateDelegate {
                 self.tutorialManager = nil
                 self.tutorialOverlay = nil
                 
+                self.completionBanner?.removeFromSuperview()
+                
                 self.showTutorialCompletionMessage()
             }
         }
     }
+    
+    private func showCompletionBanner() {
+        // First, remove the existing tutorial overlay
+        tutorialOverlay?.removeFromSuperview()
+        
+        // Create a custom completion banner
+        let banner = UIView()
+        banner.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        banner.layer.cornerRadius = 8
+        banner.layer.borderWidth = 1
+        banner.layer.borderColor = UIColor.green.cgColor
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(banner)
+        
+        // Create the instruction label
+        let instructionLabel = UILabel()
+        instructionLabel.text = "Complete the puzzle by matching all target values."
+        instructionLabel.textColor = .white
+        instructionLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .medium)
+        instructionLabel.numberOfLines = 0
+        instructionLabel.textAlignment = .center
+        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
+        banner.addSubview(instructionLabel)
+        
+        // Add constraints
+        NSLayoutConstraint.activate([
+            // Position banner below navigation bar
+            banner.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 90),
+            banner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            banner.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.9),
+            
+            // Position label inside banner
+            instructionLabel.topAnchor.constraint(equalTo: banner.topAnchor, constant: 10),
+            instructionLabel.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -10),
+            instructionLabel.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 10),
+            instructionLabel.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -10)
+        ])
+        
+        // Store a reference to this banner
+        self.completionBanner = banner
+    }
+
 
     private func showTutorialCompletionMessage() {
         let alert = UIAlertController(
@@ -770,8 +838,7 @@ class GameViewController: UIViewController, GameStateDelegate {
                 cellView.showHints = viewModel.gameState.showHints
                 cellView.selectedMagnetType = viewModel.gameState.selectedMagnetType
                 
-                // Apply terminal styling to the cell
-                cellView.updateStyleForTerminalTheme()
+                cellView.backgroundColor = .white
                 
                 // Position the cell
                 let x = CGFloat(col) * (cellSize + 4) + 2
@@ -927,26 +994,25 @@ class GameViewController: UIViewController, GameStateDelegate {
         }
     
     private func updateSolutionButton() {
-            // Use a different icon when showing solution
-            let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-            let iconName = viewModel.gameState.showSolution ? "eye.slash.fill" : "puzzlepiece.fill"
-            let icon = UIImage(systemName: iconName, withConfiguration: configuration)
-            solutionButton.setImage(icon, for: .normal)
-            
-            // Change background color when showing solution
-            solutionButton.backgroundColor = viewModel.gameState.showSolution
-                ? UIColor.black
-                : UIColor(red: 0.6, green: 0.4, blue: 0.7, alpha: 1.0) // Regular purple
-            
-            if viewModel.gameState.showSolution {
-                solutionButton.layer.borderWidth = 2
-                solutionButton.layer.borderColor = UIColor.purple.withAlphaComponent(0.7).cgColor
-                solutionButton.tintColor = .purple
-            } else {
-                solutionButton.layer.borderWidth = 0
-                solutionButton.tintColor = .white
-            }
+        // Use a different icon when showing solution
+        let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+        let iconName = viewModel.gameState.showSolution ? "eye.slash.fill" : "puzzlepiece.fill"
+        let icon = UIImage(systemName: iconName, withConfiguration: configuration)
+        solutionButton.setImage(icon, for: .normal)
+        
+        // Change appearance when showing solution
+        if viewModel.gameState.showSolution {
+            solutionButton.backgroundColor = UIColor.green.withAlphaComponent(0.2)
+            solutionButton.layer.borderWidth = 2
+            solutionButton.layer.borderColor = UIColor.green.cgColor
+            solutionButton.tintColor = .green
+        } else {
+            solutionButton.backgroundColor = .black
+            solutionButton.layer.borderWidth = 2
+            solutionButton.layer.borderColor = UIColor.green.withAlphaComponent(0.7).cgColor
+            solutionButton.tintColor = .green
         }
+    }
         
         private func updateMessageView() {
             messageView.isHidden = !(viewModel.gameState.puzzleSolved && !viewModel.gameState.showSolution)
