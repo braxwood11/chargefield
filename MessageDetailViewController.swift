@@ -237,7 +237,7 @@ class MessageDetailViewController: UIViewController {
             bodyTextView.leadingAnchor.constraint(equalTo: messageBodyView.leadingAnchor, constant: 15),
             bodyTextView.trailingAnchor.constraint(equalTo: messageBodyView.trailingAnchor, constant: -15),
             bodyTextView.bottomAnchor.constraint(equalTo: messageBodyView.bottomAnchor, constant: -15),
-            bodyTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200)
+            bodyTextView.heightAnchor.constraint(greaterThanOrEqualToConstant:500)
         ])
     }
     
