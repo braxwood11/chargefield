@@ -74,17 +74,45 @@ class DashboardViewController: UIViewController {
     }
     
     private func setupUI() {
-        // Welcome message
-        let welcomeLabel = UILabel()
-        welcomeLabel.text = "Welcome, Field Specialist"
-        welcomeLabel.font = UIFont.monospacedSystemFont(ofSize: 20, weight: .bold)
-        welcomeLabel.textColor = .white
-        welcomeLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(welcomeLabel)
+        // Set title with terminal-style prompt
+        let titleView = UIView()
+        titleView.backgroundColor = .clear
+        titleView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(titleView)
+        
+        // Terminal prompt character
+        let promptLabel = UILabel()
+        promptLabel.text = ">"
+        promptLabel.font = UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
+        promptLabel.textColor = .green
+        promptLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleView.addSubview(promptLabel)
+        
+        // Dashboard title
+        let titleLabel = UILabel()
+        titleLabel.text = "Employee Dashboard"
+        titleLabel.font = UIFont.monospacedSystemFont(ofSize: 20, weight: .bold)
+        titleLabel.textColor = .white
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleView.addSubview(titleLabel)
+        
+        // Subtle separator line under header
+        let separatorLine = UIView()
+        separatorLine.backgroundColor = UIColor.green.withAlphaComponent(0.3)
+        separatorLine.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(separatorLine)
         
         // Connection status indicator
         let statusView = createStatusIndicator()
         view.addSubview(statusView)
+        
+        // Welcome message below header
+        let welcomeLabel = UILabel()
+        welcomeLabel.text = "Welcome, Field Specialist"
+        welcomeLabel.font = UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
+        welcomeLabel.textColor = .white
+        welcomeLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(welcomeLabel)
         
         // Available assignments section
         let assignmentsLabel = UILabel()
@@ -132,14 +160,37 @@ class DashboardViewController: UIViewController {
         
         // Set constraints
         NSLayoutConstraint.activate([
-            welcomeLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            welcomeLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            // Title view (header area)
+            titleView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            titleView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            titleView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            titleView.heightAnchor.constraint(equalToConstant: 44),
             
-            statusView.centerYAnchor.constraint(equalTo: welcomeLabel.centerYAnchor),
+            // Prompt label (">")
+            promptLabel.leadingAnchor.constraint(equalTo: titleView.leadingAnchor, constant: 20),
+            promptLabel.centerYAnchor.constraint(equalTo: titleView.centerYAnchor),
+            
+            // Title label
+            titleLabel.leadingAnchor.constraint(equalTo: promptLabel.trailingAnchor, constant: 5),
+            titleLabel.centerYAnchor.constraint(equalTo: titleView.centerYAnchor),
+            
+            // Separator line
+            separatorLine.topAnchor.constraint(equalTo: titleView.bottomAnchor),
+            separatorLine.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            separatorLine.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            separatorLine.heightAnchor.constraint(equalToConstant: 1),
+            
+            // Status in header (right aligned)
             statusView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            statusView.widthAnchor.constraint(equalToConstant: 120),
+            statusView.centerYAnchor.constraint(equalTo: titleView.centerYAnchor),
+            statusView.widthAnchor.constraint(equalToConstant: 107),
             statusView.heightAnchor.constraint(equalToConstant: 24),
             
+            // Welcome message below header
+            welcomeLabel.topAnchor.constraint(equalTo: separatorLine.bottomAnchor, constant: 20),
+            welcomeLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            
+            // Assignments section
             assignmentsLabel.topAnchor.constraint(equalTo: welcomeLabel.bottomAnchor, constant: 30),
             assignmentsLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             
@@ -167,7 +218,7 @@ class DashboardViewController: UIViewController {
     
     private func createStatusIndicator() -> UIView {
         let containerView = UIView()
-        containerView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        containerView.backgroundColor = UIColor.black
         containerView.layer.borderColor = UIColor.green.withAlphaComponent(0.5).cgColor
         containerView.layer.borderWidth = 1
         containerView.layer.cornerRadius = 12
@@ -202,7 +253,7 @@ class DashboardViewController: UIViewController {
             
             statusLabel.leadingAnchor.constraint(equalTo: statusDot.trailingAnchor, constant: 8),
             statusLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -10)
+            statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -5)
         ])
         
         return containerView
@@ -277,87 +328,88 @@ class DashboardViewController: UIViewController {
     
     private func createMessageButton() -> UIButton {
         // Create custom button with background
-        let button = UIButton(type: .custom)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.addTarget(self, action: #selector(messagesButtonTapped), for: .touchUpInside)
-        
-        // Button style
-        button.backgroundColor = UIColor.black
-        button.layer.cornerRadius = 8
-        button.layer.borderWidth = 1
-        button.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.8).cgColor
-        
-        // Create container view for layout
-        let containerView = UIView()
-        containerView.isUserInteractionEnabled = false
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(containerView)
-        
-        // Create envelope icon
-        let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
-        let iconImage = UIImageView(image: UIImage(systemName: "envelope.badge.fill", withConfiguration: configuration))
-        iconImage.tintColor = UIColor.systemOrange
-        iconImage.contentMode = .scaleAspectFit
-        iconImage.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(iconImage)
-        
-        // Message label
-        let messageLabel = UILabel()
-        messageLabel.text = "Company Messages (1)"
-        messageLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
-        messageLabel.textColor = UIColor.white
-        messageLabel.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(messageLabel)
-        
-        // Notification badge
-        let badgeView = UIView()
-        badgeView.backgroundColor = .red
-        badgeView.layer.cornerRadius = 8
-        badgeView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(badgeView)
-        
-        let badgeLabel = UILabel()
-        badgeLabel.text = "1"
-        badgeLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
-        badgeLabel.textColor = .white
-        badgeLabel.textAlignment = .center
-        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
-        badgeView.addSubview(badgeLabel)
-        
-        // Add pulsing animation to notification
-        UIView.animate(withDuration: 1.2, delay: 0, options: [.repeat, .autoreverse], animations: {
-            badgeView.alpha = 0.6
-        })
-        
-        // Set constraints
-        NSLayoutConstraint.activate([
-            containerView.topAnchor.constraint(equalTo: button.topAnchor),
-            containerView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-            containerView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
-            containerView.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+            let button = UIButton(type: .custom)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.addTarget(self, action: #selector(messagesButtonTapped), for: .touchUpInside)
             
-            iconImage.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            iconImage.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            iconImage.widthAnchor.constraint(equalToConstant: 30),
-            iconImage.heightAnchor.constraint(equalToConstant: 30),
+            // Button style
+            button.backgroundColor = UIColor.black
+            button.layer.cornerRadius = 8
+            button.layer.borderWidth = 1
+            button.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.8).cgColor
             
-            messageLabel.leadingAnchor.constraint(equalTo: iconImage.trailingAnchor, constant: 15),
-            messageLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            // Create container view for layout
+            let containerView = UIView()
+            containerView.isUserInteractionEnabled = false
+            containerView.translatesAutoresizingMaskIntoConstraints = false
+            button.addSubview(containerView)
             
-            badgeView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            badgeView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            badgeView.widthAnchor.constraint(equalToConstant: 16),
-            badgeView.heightAnchor.constraint(equalToConstant: 16),
+            // Create envelope icon
+            let configuration = UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)
+            let iconImage = UIImageView(image: UIImage(systemName: "envelope.badge.fill", withConfiguration: configuration))
+            iconImage.tintColor = UIColor.systemOrange
+            iconImage.contentMode = .scaleAspectFit
+            iconImage.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(iconImage)
             
-            badgeLabel.centerXAnchor.constraint(equalTo: badgeView.centerXAnchor),
-            badgeLabel.centerYAnchor.constraint(equalTo: badgeView.centerYAnchor)
-        ])
-        
-        return button
-    }
+            // Message label - MODIFIED: Removed the "(1)" from the text
+            let messageLabel = UILabel()
+            messageLabel.text = "Company Messages"
+            messageLabel.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+            messageLabel.textColor = UIColor.white
+            messageLabel.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(messageLabel)
+            
+            // Notification badge
+            let badgeView = UIView()
+            badgeView.backgroundColor = .red
+            badgeView.layer.cornerRadius = 8
+            badgeView.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(badgeView)
+            
+            let badgeLabel = UILabel()
+            badgeLabel.text = "1"
+            badgeLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .bold)
+            badgeLabel.textColor = .white
+            badgeLabel.textAlignment = .center
+            badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+            badgeView.addSubview(badgeLabel)
+            
+            // Add pulsing animation to notification
+            UIView.animate(withDuration: 1.2, delay: 0, options: [.repeat, .autoreverse], animations: {
+                badgeView.alpha = 0.6
+            })
+            
+            // Set constraints
+            NSLayoutConstraint.activate([
+                containerView.topAnchor.constraint(equalTo: button.topAnchor),
+                containerView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+                containerView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+                containerView.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+                
+                iconImage.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+                iconImage.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                iconImage.widthAnchor.constraint(equalToConstant: 30),
+                iconImage.heightAnchor.constraint(equalToConstant: 30),
+                
+                messageLabel.leadingAnchor.constraint(equalTo: iconImage.trailingAnchor, constant: 15),
+                messageLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                
+                badgeView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+                badgeView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                badgeView.widthAnchor.constraint(equalToConstant: 16),
+                badgeView.heightAnchor.constraint(equalToConstant: 16),
+                
+                badgeLabel.centerXAnchor.constraint(equalTo: badgeView.centerXAnchor),
+                badgeLabel.centerYAnchor.constraint(equalTo: badgeView.centerYAnchor)
+            ])
+            
+            return button
+        }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
         
         // Check if we should update tutorial status
         if let navigationController = navigationController {
@@ -370,6 +422,11 @@ class DashboardViewController: UIViewController {
                 }
             }
         }
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     
     private func updateLevelButtons() {
