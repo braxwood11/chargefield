@@ -66,6 +66,12 @@ class DialogViewController: UIViewController {
         containerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(containerView)
         
+        let buttonOverlay = UIButton(type: .system)
+        buttonOverlay.backgroundColor = .clear // Completely transparent
+        buttonOverlay.addTarget(self, action: #selector(continueButtonTapped), for: .touchUpInside)
+        buttonOverlay.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(buttonOverlay)
+        
         // Terminal prompt
         promptLabel.text = "dialog> communication_initialized"
         promptLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -133,7 +139,12 @@ class DialogViewController: UIViewController {
             continueButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
             continueButton.widthAnchor.constraint(equalToConstant: 120),
             continueButton.heightAnchor.constraint(equalToConstant: 44),
-            continueButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20)
+            continueButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20),
+            
+            buttonOverlay.centerXAnchor.constraint(equalTo: continueButton.centerXAnchor),
+                buttonOverlay.centerYAnchor.constraint(equalTo: continueButton.centerYAnchor),
+                buttonOverlay.widthAnchor.constraint(equalToConstant: 150),
+                buttonOverlay.heightAnchor.constraint(equalToConstant: 60)
         ])
         
         // Start showing the current dialog with typing effect
