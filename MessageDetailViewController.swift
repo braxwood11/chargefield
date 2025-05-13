@@ -317,7 +317,7 @@ class MessageDetailViewController: UIViewController {
             
             Please report to Dr. Morgan for your orientation training as soon as possible. Your access badge has been activated and will grant you entry to Level 1 facilities.
             
-            IMPORTANT: All field activities are strictly classified. Do not discuss your work with anyone outside the company, including family members. This is per corporate security protocol NT-7842.
+            IMPORTANT: All field activities are strictly classified. Do not discuss your work with anyone outside the company, including family members. This is per corporate security protocol TL-7840-2391.
             
             Should you have any questions, please direct them to your supervisor.
             

@@ -24,13 +24,13 @@ class DialogViewController: UIViewController {
         (speaker: "Dr. Morgan", text: "Welcome to NeutraTech! I'll be guiding you through your orientation."),
         (speaker: "Dr. Morgan", text: "Your job is to stabilize energy anomalies using our proprietary tools."),
         (speaker: "Dr. Morgan", text: "You'll place stabilizers and suppressors to achieve the target energy values."),
-        (speaker: "Dr. Morgan", text: "Don't worry about what these anomalies are yet - just focus on the numbers for now.")
+        (speaker: "Dr. Morgan", text: "The work you are doing is crucial to our facility. It's important to stay focused and take your time.")
     ]
     
     private let level1Dialogs = [
-        (speaker: "Supervisor Chen", text: "Good work on the training. Ready for your first real assignment?"),
+        (speaker: "Supervisor Chen", text: "Good work on your first training. Ready to step it up to the next level?"),
         (speaker: "Supervisor Chen", text: "These anomalies are a bit more complex. Remember your training."),
-        (speaker: "Supervisor Chen", text: "And don't ask too many questions about what we're processing. Company policy.")
+        (speaker: "Supervisor Chen", text: "No matter what happens in there, don't panic. I'll be watching.")
     ]
     
     private var currentDialogs: [(speaker: String, text: String)] = []
