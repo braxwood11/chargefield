@@ -284,6 +284,9 @@ class TutorialCoordinator {
         
         let step = tutorial.steps[currentStepIndex]
         
+        // Set interaction mode
+        overlay.allowFullInteraction = (step.id == "complete_task")
+        
         // Update instruction text
         overlay.setInstructionText(step.instruction)
         
@@ -410,15 +413,36 @@ class TutorialCoordinator {
     
     // MARK: - Actions
     @objc private func nextButtonTapped() {
-        // Validate if needed
-        if let step = currentTutorial?.steps[currentStepIndex],
-           step.validation != nil,
-           !validateCurrentStep() {
-            // Step validation failed
+        guard let tutorial = currentTutorial,
+              let step = tutorial.steps[safe: currentStepIndex] else {
             return
         }
         
-        advanceToNextStep()
+        // For steps that require action, validate before advancing
+        if step.requiresAction {
+            if validateCurrentStep() {
+                advanceToNextStep()
+            } else {
+                // Visual feedback that validation failed
+                showValidationFeedback()
+            }
+        } else {
+            // For non-action steps, advance immediately
+            advanceToNextStep()
+        }
+    }
+    
+    private func showValidationFeedback() {
+        // Add visual feedback for failed validation
+        guard let overlay = overlayView else { return }
+        
+        UIView.animate(withDuration: 0.1, animations: {
+            overlay.nextButton.backgroundColor = UIColor.red.withAlphaComponent(0.3)
+        }) { _ in
+            UIView.animate(withDuration: 0.1) {
+                overlay.nextButton.backgroundColor = .black
+            }
+        }
     }
     
     // MARK: - External Events

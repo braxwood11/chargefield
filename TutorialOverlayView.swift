@@ -21,6 +21,8 @@ class TutorialOverlayView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         
+        backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        
         // Initialize UI elements before configuring them
         nextButton = UIButton(type: .system) // This line is missing
         instructionLabel = UILabel()
@@ -95,24 +97,18 @@ class TutorialOverlayView: UIView {
     }
     
     func setNextButtonAction(_ target: Any?, action: Selector) {
-            print("Setting next button action")
-            print("Target: \(String(describing: target))")
-            print("Selector: \(action)")
-            
-            // Remove any existing targets first
-            nextButton.removeTarget(nil, action: nil, for: .touchUpInside)
-            
-            // Add the new target
-            nextButton.addTarget(target, action: action, for: .touchUpInside)
-            
-            // Debug: Add a manual tap recognizer
-            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(debugButtonTap))
-            nextButton.addGestureRecognizer(tapGesture)
-            
-            // Ensure button can be interacted with
-            nextButton.isUserInteractionEnabled = true
-            nextButton.isEnabled = true
-        }
+        // Remove any existing targets and gestures
+        nextButton.removeTarget(nil, action: nil, for: .touchUpInside)
+        nextButton.gestureRecognizers?.removeAll()
+        
+        // Add the new target
+        nextButton.addTarget(target, action: action, for: .touchUpInside)
+        
+        // Ensure button can be interacted with
+        nextButton.isUserInteractionEnabled = true
+        nextButton.isEnabled = true
+        nextButton.alpha = 1.0
+    }
     
     @objc private func debugButtonTap() {
             print("DEBUG: Next button tapped manually!")
@@ -301,26 +297,30 @@ class TutorialOverlayView: UIView {
     }
     
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        // Always allow interaction with the button
-        if nextButton.frame.contains(point) {
+        // Always allow interaction with the next button
+        if nextButton.frame.contains(point) && !nextButton.isHidden {
             return true
         }
         
-        // If full interaction is allowed, only intercept touches on the overlay UI elements
-        if allowFullInteraction {
-            return instructionLabel.frame.contains(point)
-        }
-        
-        // Otherwise use the existing logic
+        // Always allow interaction with instruction label
         if instructionLabel.frame.contains(point) {
             return true
         }
         
+        // During complete_task step, allow interaction with highlighted areas
+        if allowFullInteraction {
+            if let highlightedFrame = highlightedFrame, highlightedFrame.contains(point) {
+                return false // Allow touches to pass through to underlying views
+            }
+            return true // Block other touches
+        }
+        
+        // For other steps, allow touches in highlighted areas to pass through
         if let highlightedFrame = highlightedFrame, highlightedFrame.contains(point) {
             return false
         }
         
-        return true
+        return true // Block touches outside highlighted areas
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {

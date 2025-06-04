@@ -13,7 +13,7 @@ class LoadingViewController: UIViewController {
     private let loadingLabel = TerminalLabel()
     private let progressBar = UIProgressView()
     private let statusLabel = TerminalLabel()
-    private let companyLogo = UILabel()
+    private let companyLogo = UIImageView() // Changed from UILabel to UIImageView
     private let cursorView = UIView()
     
     // MARK: - Properties
@@ -72,14 +72,8 @@ class LoadingViewController: UIViewController {
         // Apply terminal theme background
         TerminalTheme.applyBackground(to: self)
         
-        // Company logo
-        companyLogo.text = "NeutraTech"
-        companyLogo.font = UIFont.boldSystemFont(ofSize: 42)
-        companyLogo.textColor = .white
-        companyLogo.textAlignment = .center
-        companyLogo.translatesAutoresizingMaskIntoConstraints = false
-        companyLogo.alpha = 0
-        view.addSubview(companyLogo)
+        // Company logo - Updated to use image
+        setupCompanyLogo()
         
         // Loading label
         loadingLabel.text = "SYSTEM LOADING"
@@ -117,9 +111,35 @@ class LoadingViewController: UIViewController {
         cursorView.frame = CGRect(x: 0, y: 0, width: 2, height: 16)
         
         // Set constraints
+        setupConstraints()
+        
+        // Add blinking animation to cursor
+        animateCursor()
+        
+        // Fade in UI elements
+        fadeInUIElements()
+    }
+    
+    private func setupCompanyLogo() {
+        // Load the logo image
+        companyLogo.image = UIImage(named: "NT-Logo-1")
+        companyLogo.contentMode = .scaleAspectFit
+        companyLogo.translatesAutoresizingMaskIntoConstraints = false
+        companyLogo.alpha = 0
+        
+        // Optional: Add a subtle tint if you want the logo to match the terminal theme
+        // companyLogo.tintColor = .white
+        
+        view.addSubview(companyLogo)
+    }
+    
+    private func setupConstraints() {
         NSLayoutConstraint.activate([
+            // Company logo - adjusted constraints for image
             companyLogo.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             companyLogo.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 60),
+            companyLogo.widthAnchor.constraint(lessThanOrEqualToConstant: 250), // Max width
+            companyLogo.heightAnchor.constraint(lessThanOrEqualToConstant: 175), // Max height
             
             loadingLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             loadingLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
@@ -133,12 +153,6 @@ class LoadingViewController: UIViewController {
             statusLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 20),
             statusLabel.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.8)
         ])
-        
-        // Add blinking animation to cursor
-        animateCursor()
-        
-        // Fade in UI elements
-        fadeInUIElements()
     }
     
     // MARK: - Animations

@@ -68,6 +68,10 @@ class GameViewController: UIViewController {
         super.viewDidAppear(animated)
         updateCellViews()
         updateUI()
+        
+        if isLaunchedFromDashboard, let tutorialId = tutorialId, tutorialCoordinator == nil {
+                setupTutorial(tutorialId)
+            }
     }
     
     override func viewDidLayoutSubviews() {

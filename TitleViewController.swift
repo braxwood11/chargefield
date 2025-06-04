@@ -8,8 +8,7 @@ import UIKit
 class TitleViewController: UIViewController {
     
     // MARK: - UI Elements
-    private let logoLabel = TerminalLabel()
-    private let taglineLabel = TerminalLabel()
+    private let logoImageView = UIImageView() // Changed from logoLabel to logoImageView
     private let startButton = TerminalButton()
     
     // MARK: - Lifecycle
@@ -26,21 +25,9 @@ class TitleViewController: UIViewController {
         TerminalTheme.applyBackground(to: self)
         
         // Configure logo
-        logoLabel.text = "NeutraTech"
-        logoLabel.font = UIFont.boldSystemFont(ofSize: 42)
-        logoLabel.textColor = .white
-        logoLabel.textAlignment = .center
-        logoLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(logoLabel)
+        setupLogo()
         
-        // Configure tagline
-        taglineLabel.text = "Harmonizing the Future"
-        taglineLabel.style = .caption
-        taglineLabel.font = UIFont.italicSystemFont(ofSize: 18)
-        taglineLabel.textColor = UIColor.white.withAlphaComponent(0.8)
-        taglineLabel.textAlignment = .center
-        taglineLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(taglineLabel)
+        
         
         // Configure start button
         startButton.setTitle("Access Account", for: .normal)
@@ -57,38 +44,50 @@ class TitleViewController: UIViewController {
         addButtonPressEffect(to: startButton)
         
         // Set constraints
-        NSLayoutConstraint.activate([
-            logoLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            logoLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -60),
-            
-            taglineLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            taglineLabel.topAnchor.constraint(equalTo: logoLabel.bottomAnchor, constant: 20),
-            
-            startButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            startButton.topAnchor.constraint(equalTo: taglineLabel.bottomAnchor, constant: 40),
-            startButton.widthAnchor.constraint(equalToConstant: 200),
-            startButton.heightAnchor.constraint(equalToConstant: 50)
-        ])
+        setupConstraints()
         
         // Add fade-in animation
         animateUIElements()
     }
     
+    private func setupLogo() {
+        // Load the logo image
+        logoImageView.image = UIImage(named: "NT-Logo-1")
+        logoImageView.contentMode = .scaleAspectFit
+        logoImageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Optional: Add a subtle tint if you want the logo to match the terminal theme
+        // logoImageView.tintColor = .white
+        
+        view.addSubview(logoImageView)
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            // Logo - updated constraints for image
+            logoImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            logoImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -60),
+            logoImageView.widthAnchor.constraint(lessThanOrEqualToConstant: 280), // Max width
+            logoImageView.heightAnchor.constraint(lessThanOrEqualToConstant: 175), // Max height
+            
+            startButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            startButton.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 40),
+            startButton.widthAnchor.constraint(equalToConstant: 200),
+            startButton.heightAnchor.constraint(equalToConstant: 50)
+        ])
+    }
+    
     // MARK: - Animations
     private func animateUIElements() {
         // Set initial alpha
-        logoLabel.alpha = 0
-        taglineLabel.alpha = 0
+        logoImageView.alpha = 0
         startButton.alpha = 0
         
         // Animate fade-in
         UIView.animate(withDuration: 0.8, delay: 0.2, options: .curveEaseOut) {
-            self.logoLabel.alpha = 1
+            self.logoImageView.alpha = 1
         }
         
-        UIView.animate(withDuration: 0.8, delay: 0.4, options: .curveEaseOut) {
-            self.taglineLabel.alpha = 1
-        }
         
         UIView.animate(withDuration: 0.8, delay: 0.6, options: .curveEaseOut) {
             self.startButton.alpha = 1
