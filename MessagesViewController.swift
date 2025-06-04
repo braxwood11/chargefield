@@ -8,96 +8,62 @@
 import UIKit
 
 class MessagesViewController: UIViewController {
+    
+    // MARK: - UI Elements
     private let tableView = UITableView()
-    private let backgroundView = UIView()
+    private var messages: [Message] = []
     
-    // Sample messages for prototype
-    private let messages = [
-        (sender: "HR Department", subject: "Welcome to NeutraTech", preview: "Please complete your orientation training...", isUnread: true),
-        (sender: "IT Support", subject: "Employee Credentials", preview: "Your system access has been provisioned...", isUnread: false),
-        (sender: "Dr. Morgan", subject: "Training Schedule", preview: "Looking forward to guiding you through...", isUnread: false)
-    ]
-    
+    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // Set up navigation bar
-        title = "COMPANY MESSAGES"
         setupNavigationBar()
+        setupUI()
+        loadMessages()
         
-        // Set up background
-        view.backgroundColor = .black
-        setupBackground()
-        
-        // Set up table view
-        setupTableView()
+        // Listen for new messages
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleNewMessage),
+            name: .newMessageReceived,
+            object: nil
+        )
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        loadMessages()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - Setup
     private func setupNavigationBar() {
-        // Style navigation bar to match terminal theme
-        navigationController?.navigationBar.tintColor = .green
-        navigationController?.navigationBar.titleTextAttributes = [
-            NSAttributedString.Key.foregroundColor: UIColor.white,
-            NSAttributedString.Key.font: UIFont.monospacedSystemFont(ofSize: 18, weight: .bold)
-        ]
+        title = "COMPANY MESSAGES"
+        TerminalTheme.styleNavigationBar(navigationController?.navigationBar)
         
-        // Add terminal-style refresh button
-        let refreshButton = UIBarButtonItem(image: UIImage(systemName: "arrow.clockwise"), style: .plain, target: self, action: #selector(refreshMessages))
-        refreshButton.tintColor = .green
+        // Add refresh button
+        let refreshButton = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.clockwise"),
+            style: .plain,
+            target: self,
+            action: #selector(refreshMessages)
+        )
+        refreshButton.tintColor = TerminalTheme.Colors.primaryGreen
         navigationItem.rightBarButtonItem = refreshButton
     }
     
-    private func setupBackground() {
-        // Create a grid pattern background
-        backgroundView.frame = view.bounds
-        backgroundView.backgroundColor = .clear
-        backgroundView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(backgroundView)
-        view.sendSubviewToBack(backgroundView)
+    private func setupUI() {
+        // Apply terminal theme
+        TerminalTheme.applyBackground(to: self)
         
-        // Create grid lines
-        let gridSize: CGFloat = 30
-        let lineWidth: CGFloat = 0.5
-        let lineColor = UIColor.green.withAlphaComponent(0.2)
+        // Create header
+        let headerView = createHeaderView()
+        tableView.tableHeaderView = headerView
         
-        // Horizontal lines
-        for y in stride(from: 0, to: view.bounds.height, by: gridSize) {
-            let lineView = UIView(frame: CGRect(x: 0, y: y, width: view.bounds.width, height: lineWidth))
-            lineView.backgroundColor = lineColor
-            backgroundView.addSubview(lineView)
-        }
-        
-        // Vertical lines
-        for x in stride(from: 0, to: view.bounds.width, by: gridSize) {
-            let lineView = UIView(frame: CGRect(x: x, y: 0, width: lineWidth, height: view.bounds.height))
-            lineView.backgroundColor = lineColor
-            backgroundView.addSubview(lineView)
-        }
-        
-        // Add glow dots at random intersections
-        let intersections = min(15, Int((view.bounds.width / gridSize) * (view.bounds.height / gridSize) / 12))
-        
-        for _ in 0..<intersections {
-            let randomX = Int.random(in: 1..<Int(view.bounds.width / gridSize)) * Int(gridSize)
-            let randomY = Int.random(in: 1..<Int(view.bounds.height / gridSize)) * Int(gridSize)
-            
-            let dotSize: CGFloat = 4
-            let dotView = UIView(frame: CGRect(x: CGFloat(randomX) - dotSize/2, y: CGFloat(randomY) - dotSize/2, width: dotSize, height: dotSize))
-            dotView.backgroundColor = .green
-            dotView.layer.cornerRadius = dotSize/2
-            dotView.alpha = CGFloat.random(in: 0.2...0.6)
-            backgroundView.addSubview(dotView)
-            
-            // Add pulse animation to some dots
-            if Bool.random() {
-                UIView.animate(withDuration: Double.random(in: 1.5...3.0), delay: 0, options: [.repeat, .autoreverse], animations: {
-                    dotView.alpha = CGFloat.random(in: 0.1...0.3)
-                })
-            }
-        }
-    }
-    
-    private func setupTableView() {
+        // Setup table view
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(MessageCell.self, forCellReuseIdentifier: "messageCell")
@@ -105,10 +71,6 @@ class MessagesViewController: UIViewController {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         view.addSubview(tableView)
-        
-        // Add header
-        let headerView = createHeaderView()
-        tableView.tableHeaderView = headerView
         
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -123,29 +85,26 @@ class MessagesViewController: UIViewController {
         headerView.backgroundColor = .clear
         
         // Status container
-        let statusContainer = UIView()
-        statusContainer.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        statusContainer.layer.borderColor = UIColor.green.withAlphaComponent(0.5).cgColor
-        statusContainer.layer.borderWidth = 1
-        statusContainer.layer.cornerRadius = 8
+        let statusContainer = TerminalContainerView()
         statusContainer.translatesAutoresizingMaskIntoConstraints = false
         headerView.addSubview(statusContainer)
         
         // Terminal prompt
-        let promptLabel = UILabel()
+        let promptLabel = TerminalLabel()
+        promptLabel.style = .terminal
         promptLabel.text = "system> communications_channel_initialized"
-        promptLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        promptLabel.textColor = .green
         promptLabel.translatesAutoresizingMaskIntoConstraints = false
         statusContainer.addSubview(promptLabel)
         
         // Status message
-        let statusLabel = UILabel()
-        statusLabel.text = "Displaying 3 messages (1 unread)"
-        statusLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-        statusLabel.textColor = .white
+        let statusLabel = TerminalLabel()
+        statusLabel.style = .body
+        statusLabel.text = "Loading messages..."
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         statusContainer.addSubview(statusLabel)
+        
+        // Store reference to update later
+        statusLabel.tag = 1001
         
         // Set constraints
         NSLayoutConstraint.activate([
@@ -167,43 +126,96 @@ class MessagesViewController: UIViewController {
         return headerView
     }
     
+    // MARK: - Data Loading
+    private func loadMessages() {
+        messages = MessageManager.shared.getAllMessages()
+        tableView.reloadData()
+        updateHeaderStatus()
+    }
+    
+    private func updateHeaderStatus() {
+        if let statusLabel = tableView.tableHeaderView?.viewWithTag(1001) as? UILabel {
+            let unreadCount = messages.filter { !$0.isRead }.count
+            statusLabel.text = "Displaying \(messages.count) messages (\(unreadCount) unread)"
+        }
+    }
+    
+    // MARK: - Actions
     @objc private func refreshMessages() {
-        // Add refresh animation
-        let rotation = CABasicAnimation(keyPath: "transform.rotation")
-        rotation.fromValue = 0
-        rotation.toValue = 2 * Double.pi
-        rotation.duration = 1
-        navigationItem.rightBarButtonItem?.customView?.layer.add(rotation, forKey: "rotationAnimation")
+        // Animate refresh button
+        if let button = navigationItem.rightBarButtonItem?.customView {
+            let rotation = CABasicAnimation(keyPath: "transform.rotation")
+            rotation.fromValue = 0
+            rotation.toValue = 2 * Double.pi
+            rotation.duration = 1
+            button.layer.add(rotation, forKey: "rotationAnimation")
+        }
         
-        // Simulate refreshing messages
-        tableView.alpha = 0.5
+        // Show loading state
+        showLoadingOverlay()
         
-        // Add terminal-style "loading" text
-        let loadingLabel = UILabel()
+        // Simulate refresh delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.hideLoadingOverlay()
+            self?.loadMessages()
+            
+            // Check for new messages
+            MessageManager.shared.checkTriggeredMessages()
+        }
+    }
+    
+    @objc private func handleNewMessage(_ notification: Notification) {
+        loadMessages()
+        
+        // Optionally scroll to top to show new message
+        if !messages.isEmpty {
+            tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
+        }
+    }
+    
+    // MARK: - Loading Overlay
+    private func showLoadingOverlay() {
+        let loadingView = UIView()
+        loadingView.tag = 9999
+        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        loadingView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(loadingView)
+        
+        let loadingLabel = TerminalLabel()
+        loadingLabel.style = .terminal
         loadingLabel.text = "Updating message queue..."
-        loadingLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-        loadingLabel.textColor = .green
         loadingLabel.textAlignment = .center
         loadingLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(loadingLabel)
+        loadingView.addSubview(loadingLabel)
         
         NSLayoutConstraint.activate([
-            loadingLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loadingLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            loadingView.topAnchor.constraint(equalTo: view.topAnchor),
+            loadingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            loadingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            loadingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            loadingLabel.centerXAnchor.constraint(equalTo: loadingView.centerXAnchor),
+            loadingLabel.centerYAnchor.constraint(equalTo: loadingView.centerYAnchor)
         ])
         
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            // Reset table view
-            self.tableView.alpha = 1.0
-            loadingLabel.removeFromSuperview()
-            
-            // Reload data
-            self.tableView.reloadData()
+        loadingView.alpha = 0
+        UIView.animate(withDuration: 0.3) {
+            loadingView.alpha = 1
+        }
+    }
+    
+    private func hideLoadingOverlay() {
+        if let loadingView = view.viewWithTag(9999) {
+            UIView.animate(withDuration: 0.3, animations: {
+                loadingView.alpha = 0
+            }) { _ in
+                loadingView.removeFromSuperview()
+            }
         }
     }
 }
 
+// MARK: - UITableView DataSource & Delegate
 extension MessagesViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return messages.count
@@ -226,39 +238,44 @@ extension MessagesViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
-        // Simulate "selecting" animation
-        if let cell = tableView.cellView(at: indexPath) as? MessageCell {
-            // Flash the cell green briefly
+        let message = messages[indexPath.row]
+        
+        // Mark as read
+        MessageManager.shared.markAsRead(message.id)
+        
+        // Animate cell selection
+        if let cell = tableView.cellForRow(at: indexPath) as? MessageCell {
             UIView.animate(withDuration: 0.1, animations: {
-                cell.contentView.backgroundColor = UIColor.green.withAlphaComponent(0.2)
+                cell.contentView.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.2)
             }) { _ in
-                UIView.animate(withDuration: 0.1, animations: {
+                UIView.animate(withDuration: 0.1) {
                     cell.contentView.backgroundColor = .clear
-                })
+                }
             }
         }
         
-        // Show message content
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            let messageDetailVC = MessageDetailViewController()
-            messageDetailVC.message = (self.messages[indexPath.row].sender,
-                                      self.messages[indexPath.row].subject,
-                                      self.messages[indexPath.row].preview)
-            self.navigationController?.pushViewController(messageDetailVC, animated: true)
+        // Navigate to detail view
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            let detailVC = MessageDetailViewController()
+            detailVC.message = message
+            self?.navigationController?.pushViewController(detailVC, animated: true)
         }
     }
 }
 
-// Custom cell for message display
+// MARK: - Message Cell
 class MessageCell: UITableViewCell {
-    private let containerView = UIView()
-    private let senderLabel = UILabel()
-    private let subjectLabel = UILabel()
-    private let previewLabel = UILabel()
-    private let dateLabel = UILabel()
+    
+    // MARK: - UI Elements
+    private let containerView = TerminalContainerView()
+    private let senderLabel = TerminalLabel()
+    private let subjectLabel = TerminalLabel()
+    private let previewLabel = TerminalLabel()
+    private let dateLabel = TerminalLabel()
     private let unreadIndicator = UIView()
     private let iconView = UIImageView()
     
+    // MARK: - Initialization
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
@@ -268,47 +285,39 @@ class MessageCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    // MARK: - Setup
     private func setupUI() {
-        // Cell background
         backgroundColor = .clear
         selectionStyle = .none
         
         // Container view
-        containerView.backgroundColor = UIColor.black
-        containerView.layer.borderColor = UIColor.green.withAlphaComponent(0.3).cgColor
-        containerView.layer.borderWidth = 1
-        containerView.layer.cornerRadius = 8
         containerView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(containerView)
         
         // Message icon
-        iconView.image = UIImage(systemName: "envelope.fill")
-        iconView.tintColor = .systemOrange
         iconView.contentMode = .scaleAspectFit
         iconView.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(iconView)
         
         // Sender label
-        senderLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-        senderLabel.textColor = .white
+        senderLabel.style = .body
         senderLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(senderLabel)
         
         // Subject label
-        subjectLabel.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        subjectLabel.textColor = UIColor.white.withAlphaComponent(0.9)
+        subjectLabel.style = .body
+        subjectLabel.font = TerminalTheme.Fonts.monospaced(size: 13, weight: .semibold)
         subjectLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(subjectLabel)
         
         // Preview label
-        previewLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        previewLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        previewLabel.style = .caption
         previewLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(previewLabel)
         
-        // Date label (simulated date)
-        dateLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-        dateLabel.textColor = UIColor.green
+        // Date label
+        dateLabel.style = .terminal
+        dateLabel.font = TerminalTheme.Fonts.monospaced(size: 10, weight: .regular)
         dateLabel.textAlignment = .right
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(dateLabel)
@@ -355,17 +364,47 @@ class MessageCell: UITableViewCell {
         ])
     }
     
-    func configure(with message: (sender: String, subject: String, preview: String, isUnread: Bool)) {
+    // MARK: - Configuration
+    func configure(with message: Message) {
         senderLabel.text = message.sender
         subjectLabel.text = message.subject
-        previewLabel.text = message.preview
-        dateLabel.text = "04.05.2025"
+        previewLabel.text = String(message.body.prefix(50)) + "..."
         
-        // Show unread indicator if message is unread
-        unreadIndicator.isHidden = !message.isUnread
+        // Format date
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM.dd.yyyy"
+        dateLabel.text = formatter.string(from: message.timestamp)
         
-        // Change icon based on sender
-        switch message.sender {
+        // Show unread indicator
+        unreadIndicator.isHidden = message.isRead
+        
+        // Configure icon based on sender
+        configureIcon(for: message.sender)
+        
+        // Style based on read status and priority
+        if !message.isRead {
+            containerView.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.5).cgColor
+            containerView.layer.borderWidth = 1.5
+            
+            // Add pulsing animation to unread indicator
+            UIView.animate(withDuration: 1.2, delay: 0, options: [.repeat, .autoreverse]) {
+                self.unreadIndicator.alpha = 0.6
+            }
+            
+            senderLabel.font = TerminalTheme.Fonts.monospaced(size: 14, weight: .heavy)
+            subjectLabel.font = TerminalTheme.Fonts.monospaced(size: 13, weight: .bold)
+        } else {
+            containerView.layer.borderColor = TerminalTheme.Colors.borderGreen.withAlphaComponent(0.3).cgColor
+            containerView.layer.borderWidth = 1
+            unreadIndicator.layer.removeAllAnimations()
+            
+            senderLabel.font = TerminalTheme.Fonts.monospaced(size: 14, weight: .bold)
+            subjectLabel.font = TerminalTheme.Fonts.monospaced(size: 13, weight: .semibold)
+        }
+    }
+    
+    private func configureIcon(for sender: String) {
+        switch sender {
         case "HR Department":
             iconView.image = UIImage(systemName: "person.text.rectangle.fill")
             iconView.tintColor = .systemPink
@@ -375,37 +414,12 @@ class MessageCell: UITableViewCell {
         case "Dr. Morgan":
             iconView.image = UIImage(systemName: "stethoscope")
             iconView.tintColor = .systemTeal
+        case "Supervisor Chen":
+            iconView.image = UIImage(systemName: "person.badge.shield.checkmark.fill")
+            iconView.tintColor = .systemPurple
         default:
             iconView.image = UIImage(systemName: "envelope.fill")
             iconView.tintColor = .systemOrange
         }
-        
-        // Make unread messages stand out more
-        if message.isUnread {
-            containerView.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.5).cgColor
-            containerView.layer.borderWidth = 1.5
-            
-            // Add pulsing animation to unread indicator
-            UIView.animate(withDuration: 1.2, delay: 0, options: [.repeat, .autoreverse], animations: {
-                self.unreadIndicator.alpha = 0.6
-            })
-            
-            senderLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .heavy)
-            subjectLabel.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .bold)
-        } else {
-            containerView.layer.borderColor = UIColor.green.withAlphaComponent(0.3).cgColor
-            containerView.layer.borderWidth = 1
-            unreadIndicator.layer.removeAllAnimations()
-            
-            senderLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-            subjectLabel.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        }
-    }
-}
-
-// Helper extension for tableView
-extension UITableView {
-    func cellView(at indexPath: IndexPath) -> UITableViewCell? {
-        return cellForRow(at: indexPath)
     }
 }

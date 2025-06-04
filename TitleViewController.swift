@@ -7,25 +7,25 @@ import UIKit
 
 class TitleViewController: UIViewController {
     
-    private let logoLabel = UILabel()
-    private let taglineLabel = UILabel()
-    private let startButton = UIButton(type: .system)
-    private let backgroundView = UIView()
+    // MARK: - UI Elements
+    private let logoLabel = TerminalLabel()
+    private let taglineLabel = TerminalLabel()
+    private let startButton = TerminalButton()
     
+    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setupUI()
+        checkFirstLaunch()
     }
     
+    // MARK: - UI Setup
     private func setupUI() {
-        // Add dark background
-        view.backgroundColor = .black
+        // Apply terminal theme background
+        TerminalTheme.applyBackground(to: self)
         
-        // Add grid background effect
-        setupGridBackground()
-        
-        // Company logo
+        // Configure logo
         logoLabel.text = "NeutraTech"
         logoLabel.font = UIFont.boldSystemFont(ofSize: 42)
         logoLabel.textColor = .white
@@ -33,23 +33,28 @@ class TitleViewController: UIViewController {
         logoLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(logoLabel)
         
-        // Tagline
+        // Configure tagline
         taglineLabel.text = "Harmonizing the Future"
+        taglineLabel.style = .caption
         taglineLabel.font = UIFont.italicSystemFont(ofSize: 18)
         taglineLabel.textColor = UIColor.white.withAlphaComponent(0.8)
         taglineLabel.textAlignment = .center
         taglineLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(taglineLabel)
         
-        // Start button
+        // Configure start button
         startButton.setTitle("Access Account", for: .normal)
+        startButton.style = .primary
         startButton.backgroundColor = .systemGreen
         startButton.setTitleColor(.white, for: .normal)
         startButton.layer.cornerRadius = 8
-        startButton.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 16, weight: .bold)
+        startButton.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 16, weight: .bold)
         startButton.translatesAutoresizingMaskIntoConstraints = false
         startButton.addTarget(self, action: #selector(startButtonTapped), for: .touchUpInside)
         view.addSubview(startButton)
+        
+        // Add button press effect
+        addButtonPressEffect(to: startButton)
         
         // Set constraints
         NSLayoutConstraint.activate([
@@ -64,68 +69,65 @@ class TitleViewController: UIViewController {
             startButton.widthAnchor.constraint(equalToConstant: 200),
             startButton.heightAnchor.constraint(equalToConstant: 50)
         ])
+        
+        // Add fade-in animation
+        animateUIElements()
     }
     
-    private func setupGridBackground() {
-        // Create a grid pattern background
-        backgroundView.frame = view.bounds
-        backgroundView.backgroundColor = .clear
-        backgroundView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(backgroundView)
-        view.sendSubviewToBack(backgroundView)
+    // MARK: - Animations
+    private func animateUIElements() {
+        // Set initial alpha
+        logoLabel.alpha = 0
+        taglineLabel.alpha = 0
+        startButton.alpha = 0
         
-        // Create grid lines
-        let gridSize: CGFloat = 30
-        let lineWidth: CGFloat = 0.5
-        let lineColor = UIColor.green.withAlphaComponent(0.2)
-        
-        // Horizontal lines
-        for y in stride(from: 0, to: view.bounds.height, by: gridSize) {
-            let lineView = UIView(frame: CGRect(x: 0, y: y, width: view.bounds.width, height: lineWidth))
-            lineView.backgroundColor = lineColor
-            backgroundView.addSubview(lineView)
+        // Animate fade-in
+        UIView.animate(withDuration: 0.8, delay: 0.2, options: .curveEaseOut) {
+            self.logoLabel.alpha = 1
         }
         
-        // Vertical lines
-        for x in stride(from: 0, to: view.bounds.width, by: gridSize) {
-            let lineView = UIView(frame: CGRect(x: x, y: 0, width: lineWidth, height: view.bounds.height))
-            lineView.backgroundColor = lineColor
-            backgroundView.addSubview(lineView)
+        UIView.animate(withDuration: 0.8, delay: 0.4, options: .curveEaseOut) {
+            self.taglineLabel.alpha = 1
         }
         
-        // Add glow dots at random intersections
-        let intersections = min(20, Int((view.bounds.width / gridSize) * (view.bounds.height / gridSize) / 10))
-        
-        for _ in 0..<intersections {
-            let randomX = Int.random(in: 1..<Int(view.bounds.width / gridSize)) * Int(gridSize)
-            let randomY = Int.random(in: 1..<Int(view.bounds.height / gridSize)) * Int(gridSize)
-            
-            let dotSize: CGFloat = 4
-            let dotView = UIView(frame: CGRect(x: CGFloat(randomX) - dotSize/2, y: CGFloat(randomY) - dotSize/2, width: dotSize, height: dotSize))
-            dotView.backgroundColor = .green
-            dotView.layer.cornerRadius = dotSize/2
-            dotView.alpha = CGFloat.random(in: 0.2...0.6)
-            backgroundView.addSubview(dotView)
-            
-            // Add pulse animation to some dots
-            if Bool.random() {
-                animateDotPulse(dotView)
-            }
+        UIView.animate(withDuration: 0.8, delay: 0.6, options: .curveEaseOut) {
+            self.startButton.alpha = 1
         }
     }
     
-    private func animateDotPulse(_ dotView: UIView) {
-        UIView.animate(withDuration: Double.random(in: 1.5...3.0), delay: 0, options: [.repeat, .autoreverse], animations: {
-            dotView.alpha = CGFloat.random(in: 0.1...0.3)
-        })
+    private func addButtonPressEffect(to button: UIButton) {
+        button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
     }
     
+    @objc private func buttonTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            sender.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            sender.alpha = 0.8
+        }
+    }
+    
+    @objc private func buttonTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            sender.transform = .identity
+            sender.alpha = 1.0
+        }
+    }
+    
+    // MARK: - Actions
     @objc private func startButtonTapped() {
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        // Create smooth transition
+        createTransitionToLoading()
+    }
+    
+    private func createTransitionToLoading() {
         // Create a snapshot of the current view for smooth transition
         guard let snapshot = view.snapshotView(afterScreenUpdates: false) else {
-            // Navigate to loading screen if snapshot fails
-            let loadingVC = LoadingViewController()
-            navigationController?.pushViewController(loadingVC, animated: true)
+            navigateToLoading()
             return
         }
         
@@ -140,22 +142,32 @@ class TitleViewController: UIViewController {
         
         // Animate the transition
         UIView.animate(withDuration: 0.5, animations: {
-            // Fade out the logo and tag line, but keep the grid
-            if let logo = snapshot.subviews.first(where: { $0 is UILabel && ($0 as? UILabel)?.text == "NeutraTech" }) {
-                logo.alpha = 0
-            }
-            
-            if let tagline = snapshot.subviews.first(where: { $0 is UILabel && ($0 as? UILabel)?.text == "Harmonizing the Future" }) {
-                tagline.alpha = 0
-            }
-            
-            if let button = snapshot.subviews.first(where: { $0 is UIButton }) {
-                button.alpha = 0
+            // Fade out UI elements but keep the grid
+            snapshot.subviews.forEach { subview in
+                if subview is UILabel || subview is UIButton {
+                    subview.alpha = 0
+                }
             }
         }) { _ in
-            // Once animation completes, remove the snapshot and start the loading animation
+            // Remove snapshot and start loading animation
             snapshot.removeFromSuperview()
             loadingVC.startLoadingAnimation()
         }
+    }
+    
+    private func navigateToLoading() {
+        let loadingVC = LoadingViewController()
+        navigationController?.pushViewController(loadingVC, animated: true)
+        
+        // Start loading animation after transition
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            loadingVC.startLoadingAnimation()
+        }
+    }
+    
+    // MARK: - First Launch Check
+    private func checkFirstLaunch() {
+        // Check messages for first launch
+        MessageManager.shared.checkTriggeredMessages()
     }
 }

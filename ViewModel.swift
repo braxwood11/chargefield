@@ -7,24 +7,34 @@
 
 import Foundation
 
-// MARK: - ViewModel
-
+// MARK: - Game State Delegate
 protocol GameStateDelegate: AnyObject {
     func gameStateDidChange()
     func puzzleSolved()
 }
 
+// MARK: - Game View Model
 class GameViewModel {
-    var gameState: PuzzleState
-    private let gridSize: Int
-    weak var delegate: GameStateDelegate?
     
-    // Store the total magnets available for this puzzle
+    // MARK: - Properties
+    private(set) var gameState: PuzzleState
+    private let gridSize: Int
+    private let fieldCalculator: FieldCalculator
     private let totalPositiveMagnets: Int
     private let totalNegativeMagnets: Int
     
+    weak var delegate: GameStateDelegate?
+    
+    // MARK: - Initialization
     init(puzzle: PuzzleDefinition) {
         self.gridSize = puzzle.gridSize
+        self.totalPositiveMagnets = puzzle.positiveMagnets
+        self.totalNegativeMagnets = puzzle.negativeMagnets
+        
+        // Initialize field calculator
+        self.fieldCalculator = FieldCalculatorFactory.getCalculator(for: puzzle.gridSize)
+        
+        // Initialize game state
         self.gameState = PuzzleState(
             gridSize: puzzle.gridSize,
             initialCharges: puzzle.initialCharges,
@@ -34,103 +44,62 @@ class GameViewModel {
             negativeMagnets: puzzle.negativeMagnets
         )
         
-        // Store the total magnets for this puzzle
-        self.totalPositiveMagnets = puzzle.positiveMagnets
-        self.totalNegativeMagnets = puzzle.negativeMagnets
-        
         // Calculate initial field values
         updateFieldValues()
     }
     
-    // Calculate field values based on magnet placements
+    // MARK: - Field Calculation
     func updateFieldValues() {
-        // Start with initial charges
-        var fieldValues = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)
-        
-        // Copy the initial charges to the field values
-        for row in 0..<gridSize {
-            for col in 0..<gridSize {
-                fieldValues[row][col] = gameState.grid[row][col].initialCharge
-            }
+        // Extract current magnet placements
+        var magnets: [[Int]] = []
+        for row in gameState.grid {
+            magnets.append(row.map { $0.toolEffect })
         }
         
-        // For each magnet, calculate its influence on all cells
-        for row in 0..<gridSize {
-            for col in 0..<gridSize {
-                let magnetValue = gameState.grid[row][col].toolEffect
-                if magnetValue != 0 {
-                    // Add the magnet's own value to its cell
-                    fieldValues[row][col] += magnetValue * 3  // Strength at its own position
-                    
-                    // Affect the row
-                    for c in 0..<gridSize {
-                        if c != col {
-                            // Calculate distance
-                            let distance = abs(c - col)
-                            // Influence is 2 at distance 1, 1 at distance 2, 0 beyond
-                            var influence = 0
-                            if distance == 1 {
-                                influence = 2 * magnetValue
-                            } else if distance == 2 {
-                                influence = 1 * magnetValue
-                            }
-                            
-                            fieldValues[row][c] += influence
-                        }
-                    }
-                    
-                    // Affect the column
-                    for r in 0..<gridSize {
-                        if r != row {
-                            // Calculate distance
-                            let distance = abs(r - row)
-                            // Influence is 2 at distance 1, 1 at distance 2, 0 beyond
-                            var influence = 0
-                            if distance == 1 {
-                                influence = 2 * magnetValue
-                            } else if distance == 2 {
-                                influence = 1 * magnetValue
-                            }
-                            
-                            fieldValues[r][col] += influence
-                        }
-                    }
-                }
-            }
+        // Extract initial charges
+        var initialCharges: [[Int]] = []
+        for row in gameState.grid {
+            initialCharges.append(row.map { $0.initialCharge })
         }
         
-        // Update the current field values in the grid
+        // Calculate field values using the optimized calculator
+        let fieldValues = fieldCalculator.calculateAllFieldValues(
+            initialCharges: initialCharges,
+            magnets: magnets
+        )
+        
+        // Update grid with calculated values
         for row in 0..<gridSize {
             for col in 0..<gridSize {
                 gameState.grid[row][col].currentFieldValue = fieldValues[row][col]
             }
         }
         
-        // Check if puzzle is solved
+        // Check solution and notify delegate
         checkSolution()
-        
-        // Notify delegate
         delegate?.gameStateDidChange()
     }
     
-    // Check if the puzzle is solved
-    func checkSolution() {
+    // MARK: - Solution Checking
+    private func checkSolution() {
         let wasSolved = gameState.puzzleSolved
+        var allNeutralized = true
         
+        // Check all target cells
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                let initialCharge = gameState.grid[row][col].initialCharge
-                let currentValue = gameState.grid[row][col].currentFieldValue
+                let cell = gameState.grid[row][col]
                 
-                // Only cells with initial charge (non-zero) need to be neutralized
-                if initialCharge != 0 && currentValue != 0 {
-                    gameState.puzzleSolved = false
-                    return
+                // Only cells with initial charge need to be neutralized
+                if cell.initialCharge != 0 && cell.currentFieldValue != 0 {
+                    allNeutralized = false
+                    break
                 }
             }
+            if !allNeutralized { break }
         }
         
-        gameState.puzzleSolved = true
+        gameState.puzzleSolved = allNeutralized
         
         // Notify delegate if puzzle was just solved
         if !wasSolved && gameState.puzzleSolved {
@@ -138,101 +107,138 @@ class GameViewModel {
         }
     }
     
-    // Handle cell selection (first tap)
+    // MARK: - Cell Selection
     func selectCell(at row: Int, col: Int) {
-        // Clear any previously selected cells
-        for r in 0..<gridSize {
-            for c in 0..<gridSize {
-                gameState.grid[r][c].isSelected = false
-            }
-        }
+        // Clear previous selections
+        clearAllSelections()
         
-        // Select this cell if it's placeable
+        // Select new cell if placeable
         if gameState.grid[row][col].placeable {
             gameState.grid[row][col].isSelected = true
+            delegate?.gameStateDidChange()
         }
-        
-        // Notify delegate
+    }
+    
+    func clearAllSelections() {
+        for row in 0..<gridSize {
+            for col in 0..<gridSize {
+                gameState.grid[row][col].isSelected = false
+            }
+        }
         delegate?.gameStateDidChange()
     }
     
-    // Handle cell placement (second tap)
+    // MARK: - Magnet Placement
     func placeOrRemoveMagnet(at row: Int, col: Int) {
         guard gameState.grid[row][col].placeable else { return }
         guard !gameState.puzzleSolved || gameState.showSolution else { return }
         
         let currentValue = gameState.grid[row][col].toolEffect
+        let oldMagnet = currentValue
+        var newMagnet = 0
         
-        // If eraser is selected, remove any magnet
+        // Handle eraser mode
         if gameState.selectedMagnetType == 0 && currentValue != 0 {
+            // Return magnet to inventory
             if currentValue == 1 {
                 gameState.availableMagnets.positive += 1
             } else if currentValue == -1 {
                 gameState.availableMagnets.negative += 1
             }
             gameState.grid[row][col].toolEffect = 0
+            newMagnet = 0
         }
-        // If positive magnet is selected
+        // Handle positive magnet placement
         else if gameState.selectedMagnetType == 1 && currentValue != 1 {
-            // Check if we have available positive magnets
-            if gameState.availableMagnets.positive <= 0 { return }
+            guard gameState.availableMagnets.positive > 0 else { return }
             
-            // If there was a negative magnet, give it back
+            // Return existing magnet if any
             if currentValue == -1 {
                 gameState.availableMagnets.negative += 1
             }
             
             gameState.availableMagnets.positive -= 1
             gameState.grid[row][col].toolEffect = 1
+            newMagnet = 1
         }
-        // If negative magnet is selected
+        // Handle negative magnet placement
         else if gameState.selectedMagnetType == -1 && currentValue != -1 {
-            // Check if we have available negative magnets
-            if gameState.availableMagnets.negative <= 0 { return }
+            guard gameState.availableMagnets.negative > 0 else { return }
             
-            // If there was a positive magnet, give it back
+            // Return existing magnet if any
             if currentValue == 1 {
                 gameState.availableMagnets.positive += 1
             }
             
             gameState.availableMagnets.negative -= 1
             gameState.grid[row][col].toolEffect = -1
+            newMagnet = -1
         }
         
-        // Clear selection after placement (important!)
+        // Clear selection
         gameState.grid[row][col].isSelected = false
         
-        // Update field values
-        updateFieldValues()
+        // Update field values efficiently
+        if oldMagnet != newMagnet {
+            updateFieldValueForMagnetChange(
+                at: GridPosition(row: row, col: col),
+                oldMagnet: oldMagnet,
+                newMagnet: newMagnet
+            )
+        }
     }
     
-    // Reset the puzzle
+    private func updateFieldValueForMagnetChange(at position: GridPosition, oldMagnet: Int, newMagnet: Int) {
+        // Extract initial charges
+        var initialCharges: [[Int]] = []
+        for row in gameState.grid {
+            initialCharges.append(row.map { $0.initialCharge })
+        }
+        
+        // Use optimized field calculator
+        let fieldValues = fieldCalculator.updateFieldValue(
+            at: position,
+            oldMagnet: oldMagnet,
+            newMagnet: newMagnet,
+            initialCharges: initialCharges
+        )
+        
+        // Update grid
+        for row in 0..<gridSize {
+            for col in 0..<gridSize {
+                gameState.grid[row][col].currentFieldValue = fieldValues[row][col]
+            }
+        }
+        
+        // Check solution
+        checkSolution()
+        delegate?.gameStateDidChange()
+    }
+    
+    // MARK: - Reset & Solution
     func resetPuzzle() {
-        // Reset magnets
+        // Clear all magnets
         for row in 0..<gridSize {
             for col in 0..<gridSize {
                 gameState.grid[row][col].toolEffect = 0
                 gameState.grid[row][col].isSelected = false
-                // Reset current field value to initial charge
                 gameState.grid[row][col].currentFieldValue = gameState.grid[row][col].initialCharge
             }
         }
         
-        // Reset available magnets to their original values
+        // Reset available magnets
         gameState.availableMagnets = (positive: totalPositiveMagnets, negative: totalNegativeMagnets)
         gameState.puzzleSolved = false
         gameState.showSolution = false
         
-        // Update field values
         updateFieldValues()
     }
     
-    // Show solution
     func toggleSolution() {
         if gameState.showSolution {
             resetPuzzle()
         } else {
-            // Simply apply the INVERTED solution magnets to neutralize the initial charges
+            // Apply inverted solution
             for row in 0..<gridSize {
                 for col in 0..<gridSize {
                     if row < gameState.solution.count && col < gameState.solution[row].count {
@@ -243,125 +249,198 @@ class GameViewModel {
                 }
             }
             
-            // Update available magnets (count the inverted values)
-            let positiveCount = gameState.solution.flatMap { $0 }.filter { $0 == -1 }.count // Count original negatives as new positives
-            let negativeCount = gameState.solution.flatMap { $0 }.filter { $0 == 1 }.count  // Count original positives as new negatives
-            gameState.availableMagnets = (positive: totalPositiveMagnets - positiveCount, negative: totalNegativeMagnets - negativeCount)
+            // Update available magnets
+            let positiveCount = gameState.solution.flatMap { $0 }.filter { $0 == -1 }.count
+            let negativeCount = gameState.solution.flatMap { $0 }.filter { $0 == 1 }.count
+            gameState.availableMagnets = (
+                positive: totalPositiveMagnets - positiveCount,
+                negative: totalNegativeMagnets - negativeCount
+            )
             
             gameState.showSolution = true
             updateFieldValues()
         }
     }
     
-    // Toggle hints
     func toggleHints() {
         gameState.showHints.toggle()
         delegate?.gameStateDidChange()
     }
     
-    // Calculate influence preview for selected cells
+    func areHintsEnabled() -> Bool {
+        return gameState.showHints
+    }
+    
+    // MARK: - Influence Calculation
     func getInfluenceArea(for row: Int, col: Int) -> [[Bool]] {
+        let position = GridPosition(row: row, col: col)
+        let affectedPositions = fieldCalculator.getAffectedPositions(for: position)
+        
         var influence = Array(repeating: Array(repeating: false, count: gridSize), count: gridSize)
         
-        // Mark the cell itself
-        influence[row][col] = true
-        
-        // Mark the row
-        for c in 0..<gridSize {
-            if c != col {
-                let distance = abs(c - col)
-                if distance <= 2 {
-                    influence[row][c] = true
-                }
-            }
-        }
-        
-        // Mark the column
-        for r in 0..<gridSize {
-            if r != row {
-                let distance = abs(r - row)
-                if distance <= 2 {
-                    influence[r][col] = true
-                }
-            }
+        for pos in affectedPositions {
+            influence[pos.row][pos.col] = true
         }
         
         return influence
     }
     
     func getInfluenceIntensity(from sourceRow: Int, sourceCol: Int, to targetRow: Int, targetCol: Int) -> Int {
-        // Calculate Manhattan distance
-        let rowDistance = abs(targetRow - sourceRow)
-        let colDistance = abs(targetCol - sourceCol)
+        let source = GridPosition(row: sourceRow, col: sourceCol)
+        let target = GridPosition(row: targetRow, col: targetCol)
+        let pattern = fieldCalculator.getInfluencePattern(for: source)
         
-        // Check if in same row or column
-        if sourceRow == targetRow || sourceCol == targetCol {
-            let distance = max(rowDistance, colDistance)
-            
-            if distance == 0 {
-                return 3 // Own cell - this is crucial
-            } else if distance == 1 {
-                return 2 // Adjacent cell
-            } else if distance == 2 {
-                return 1 // Two cells away
-            }
-        }
-        
-        return 0 // No influence
+        return pattern[target] ?? 0
     }
     
-    // Get the numerical impact a magnet would have if placed
     func getInfluenceValue(at row: Int, col: Int, magnetType: Int) -> Int {
-        switch magnetType {
-        case 1:  // Positive magnet
-            return 3  // Own cell gets +3
-        case -1: // Negative magnet
-            return -3 // Own cell gets -3
-        default:
-            return 0
-        }
+        return getInfluenceValue(from: row, sourceCol: col, to: row, targetCol: col, magnetType: magnetType)
     }
     
-    // Get the numerical impact on a cell from a magnet placed elsewhere
     func getInfluenceValue(from sourceRow: Int, sourceCol: Int, to targetRow: Int, targetCol: Int, magnetType: Int) -> Int {
-        let intensity = getInfluenceIntensity(from: sourceRow, sourceCol: sourceCol, to: targetRow, targetCol: targetCol)
-        return intensity * magnetType
+        let source = GridPosition(row: sourceRow, col: sourceCol)
+        let target = GridPosition(row: targetRow, col: targetCol)
+        
+        return fieldCalculator.getInfluenceValue(
+            from: source,
+            to: target,
+            magnetType: magnetType
+        )
     }
     
-    // Clear all cell selections
-    func clearAllSelections() {
+    // MARK: - Analysis Methods
+    func getNeutralizationPercentage(at row: Int, col: Int) -> Double {
+        let position = GridPosition(row: row, col: col)
+        let initialCharge = gameState.grid[row][col].initialCharge
+        
+        return fieldCalculator.getNeutralizationProgress(
+            for: position,
+            initialCharge: initialCharge
+        )
+    }
+    
+    func getOvershotCells() -> [GridPosition] {
+        var initialCharges: [[Int]] = []
+        for row in gameState.grid {
+            initialCharges.append(row.map { $0.initialCharge })
+        }
+        
+        return fieldCalculator.getOvershotCells(initialCharges: initialCharges)
+    }
+    
+    // MARK: - Puzzle Info
+    func getPuzzleInfo() -> PuzzleInfo {
+        var targetCellCount = 0
+        var neutralizedCount = 0
+        var overshotCount = 0
+        
+        let overshotCells = Set(getOvershotCells())
+        
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                gameState.grid[row][col].isSelected = false
+                let cell = gameState.grid[row][col]
+                if cell.initialCharge != 0 {
+                    targetCellCount += 1
+                    if cell.isNeutralized {
+                        neutralizedCount += 1
+                    }
+                    if overshotCells.contains(GridPosition(row: row, col: col)) {
+                        overshotCount += 1
+                    }
+                }
             }
         }
         
-        // Notify delegate
+        return PuzzleInfo(
+            gridSize: gridSize,
+            targetCells: targetCellCount,
+            neutralizedCells: neutralizedCount,
+            overshotCells: overshotCount,
+            availablePositiveMagnets: gameState.availableMagnets.positive,
+            availableNegativeMagnets: gameState.availableMagnets.negative,
+            isSolved: gameState.puzzleSolved,
+            isShowingSolution: gameState.showSolution
+        )
+    }
+    
+    // MARK: - Public Accessors
+    func setSelectedMagnetType(_ type: Int) {
+        gameState.selectedMagnetType = type
         delegate?.gameStateDidChange()
     }
     
-    // Get the percentage of neutralization for a cell
-    func getNeutralizationPercentage(at row: Int, col: Int) -> Double {
-        let initialCharge = gameState.grid[row][col].initialCharge
-        let currentValue = gameState.grid[row][col].currentFieldValue
+    func getSelectedMagnetType() -> Int {
+        return gameState.selectedMagnetType
+    }
+    
+    func isShowingSolution() -> Bool {
+        return gameState.showSolution
+    }
+    
+    func isPuzzleSolved() -> Bool {
+        return gameState.puzzleSolved
+    }
+    
+    func getAvailableMagnets() -> (positive: Int, negative: Int) {
+        return gameState.availableMagnets
+    }
+    
+    func getCellAt(row: Int, col: Int) -> MagnetCell? {
+        guard row >= 0 && row < gridSize && col >= 0 && col < gridSize else {
+            return nil
+        }
+        return gameState.grid[row][col]
+    }
+    
+    func removeMagnetDirectly(at row: Int, col: Int) {
+        guard row >= 0 && row < gridSize && col >= 0 && col < gridSize else { return }
         
-        // If not a target cell or initial charge is 0, return 0
-        if initialCharge == 0 {
-            return 0.0
+        let currentValue = gameState.grid[row][col].toolEffect
+        
+        // Return magnet to inventory
+        if currentValue == 1 {
+            gameState.availableMagnets.positive += 1
+        } else if currentValue == -1 {
+            gameState.availableMagnets.negative += 1
         }
         
-        // If neutralized, return 1.0 (100%)
-        if currentValue == 0 {
-            return 1.0
-        }
+        // Remove the magnet
+        gameState.grid[row][col].toolEffect = 0
+        gameState.grid[row][col].isSelected = false
         
-        // If overshot (crossed zero), return a value > 1.0
-        if (initialCharge > 0 && currentValue < 0) || (initialCharge < 0 && currentValue > 0) {
-            return 1.2
-        }
-        
-        // Calculate progress toward neutralization
-        let progress = 1.0 - (Double(abs(currentValue)) / Double(abs(initialCharge)))
-        return max(0.0, min(1.0, progress))
+        // Update field values
+        updateFieldValues()
+    }
+    
+    func getGridSize() -> Int {
+        return gridSize
+    }
+    
+    func getGameStateForSaving() -> PuzzleState {
+        return gameState
+    }
+}
+
+// MARK: - Puzzle Info Structure
+struct PuzzleInfo {
+    let gridSize: Int
+    let targetCells: Int
+    let neutralizedCells: Int
+    let overshotCells: Int
+    let availablePositiveMagnets: Int
+    let availableNegativeMagnets: Int
+    let isSolved: Bool
+    let isShowingSolution: Bool
+    
+    var progress: Float {
+        guard targetCells > 0 else { return 0 }
+        return Float(neutralizedCells) / Float(targetCells)
+    }
+    
+    var efficiency: Float {
+        guard targetCells > 0 else { return 0 }
+        let perfectScore = Float(targetCells)
+        let currentScore = Float(neutralizedCells) - Float(overshotCells) * 0.5
+        return max(0, currentScore / perfectScore)
     }
 }

@@ -8,79 +8,100 @@
 import Foundation
 
 // MARK: - Puzzle Generator
-
 class PuzzleGenerator {
     
-    // Generate a random puzzle with the specified difficulty
-    static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
-        
-        // Determine target cell count based on difficulty and grid size
+    // MARK: - Difficulty Configuration
+    struct DifficultyConfig {
         let targetCellRange: ClosedRange<Int>
-        if gridSize == 4 {
-            // For 4x4 grid
-            switch difficulty.lowercased() {
-            case "easy":
-                targetCellRange = 8...10  // Less cells for 4x4 easy
-            case "hard":
-                targetCellRange = 6...8   // Harder with fewer clues
-            default: // medium
-                targetCellRange = 7...9   // Medium difficulty
-            }
-        } else {
-            // For 5x5 grid (original values)
-            switch difficulty.lowercased() {
-            case "easy":
-                targetCellRange = 12...15
-            case "hard":
-                targetCellRange = 8...10
-            default: // medium
-                targetCellRange = 9...12
-            }
+        let placementStrategy: PlacementStrategy
+        
+        enum PlacementStrategy {
+            case even       // Easier - spread out targets
+            case clustered  // Harder - group targets
+            case mixed      // Medium - combination
         }
         
-        // Step 1: Generate a random solution (magnet placements)
-        var solution = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)
-        var placedPositive = 0
-        var placedNegative = 0
-        
-        // Place magnets randomly
-        while placedPositive < positiveMagnets || placedNegative < negativeMagnets {
-            let row = Int.random(in: 0..<gridSize)
-            let col = Int.random(in: 0..<gridSize)
-            
-            if solution[row][col] == 0 {
-                if placedPositive < positiveMagnets {
-                    solution[row][col] = 1
-                    placedPositive += 1
-                } else if placedNegative < negativeMagnets {
-                    solution[row][col] = -1
-                    placedNegative += 1
-                }
+        static func config(for difficulty: String, gridSize: Int) -> DifficultyConfig {
+            switch (difficulty.lowercased(), gridSize) {
+            case ("easy", 4):
+                return DifficultyConfig(
+                    targetCellRange: 8...10,
+                    placementStrategy: .even
+                )
+            case ("medium", 4):
+                return DifficultyConfig(
+                    targetCellRange: 7...9,
+                    placementStrategy: .mixed
+                )
+            case ("hard", 4):
+                return DifficultyConfig(
+                    targetCellRange: 6...8,
+                    placementStrategy: .clustered
+                )
+            case ("easy", 5):
+                return DifficultyConfig(
+                    targetCellRange: 12...15,
+                    placementStrategy: .even
+                )
+            case ("medium", 5):
+                return DifficultyConfig(
+                    targetCellRange: 9...12,
+                    placementStrategy: .mixed
+                )
+            case ("hard", 5):
+                return DifficultyConfig(
+                    targetCellRange: 8...10,
+                    placementStrategy: .clustered
+                )
+            default:
+                // Default medium difficulty
+                return DifficultyConfig(
+                    targetCellRange: 9...12,
+                    placementStrategy: .mixed
+                )
             }
         }
+    }
+    
+    // MARK: - Generate Random Puzzle
+    static func generateRandomPuzzle(
+        gridSize: Int = 5,
+        difficulty: String = "medium",
+        positiveMagnets: Int = 3,
+        negativeMagnets: Int = 3
+    ) -> PuzzleDefinition {
+        
+        let config = DifficultyConfig.config(for: difficulty, gridSize: gridSize)
+        
+        // Step 1: Generate random magnet placements (solution)
+        let solution = generateRandomSolution(
+            gridSize: gridSize,
+            positiveMagnets: positiveMagnets,
+            negativeMagnets: negativeMagnets
+        )
         
         // Step 2: Calculate resulting field values
-        let fieldValues = calculateFieldValues(magnets: solution, gridSize: gridSize)
+        let fieldCalculator = FieldCalculatorFactory.getCalculator(for: gridSize)
+        let fieldValues = calculateFieldValues(
+            solution: solution,
+            gridSize: gridSize,
+            calculator: fieldCalculator
+        )
         
-        // Step 3: Select target cells (cells that need to be neutralized)
-        let targetCellCount = Int.random(in: targetCellRange)
-        var initialCharges = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)
+        // Step 3: Select target cells based on difficulty
+        let targetCellCount = Int.random(in: config.targetCellRange)
+        let initialCharges = selectTargetCells(
+            fieldValues: fieldValues,
+            targetCount: targetCellCount,
+            strategy: config.placementStrategy,
+            gridSize: gridSize
+        )
         
-        // Strategy for selecting cells based on difficulty
-        switch difficulty.lowercased() {
-        case "easy":
-            // For easy, select cells more evenly across the grid
-            selectEvenlyDistributedTargets(initialCharges: &initialCharges, fieldValues: fieldValues, count: targetCellCount, gridSize: gridSize)
-        case "hard":
-            // For hard, select cells with some clustering
-            selectClusteredTargets(initialCharges: &initialCharges, fieldValues: fieldValues, count: targetCellCount, gridSize: gridSize)
-        default:
-            // For medium, use a balanced approach
-            selectBalancedTargets(initialCharges: &initialCharges, fieldValues: fieldValues, count: targetCellCount, gridSize: gridSize)
-        }
-        
-        // All cells are placeable
-        let placeableGrid = Array(repeating: Array(repeating: true, count: gridSize), count: gridSize)
+        // All cells are placeable by default
+        let placeableGrid = Array(
+            repeating: Array(repeating: true, count: gridSize),
+            count: gridSize
+        )
         
         return PuzzleDefinition(
             gridSize: gridSize,
@@ -92,233 +113,371 @@ class PuzzleGenerator {
         )
     }
     
-    // MARK: - Helper Methods
-    
-    // Calculate field values based on magnet placements
-    private static func calculateFieldValues(magnets: [[Int]], gridSize: Int) -> [[Int]] {
-        var fieldValues = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)
+    // MARK: - Solution Generation
+    private static func generateRandomSolution(
+        gridSize: Int,
+        positiveMagnets: Int,
+        negativeMagnets: Int
+    ) -> [[Int]] {
         
-        // For each magnet, calculate its influence on all cells
+        var solution = Array(repeating: Array(repeating: 0, count: gridSize), count: gridSize)
+        var availablePositions = [(row: Int, col: Int)]()
+        
+        // Create list of all positions
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                let magnetValue = magnets[row][col]
-                if magnetValue != 0 {
-                    // Add the magnet's own value to its cell
-                    fieldValues[row][col] += magnetValue * 3  // Strength at its own position
-                    
-                    // Affect the row
-                    for c in 0..<gridSize {
-                        if c != col {
-                            // Calculate distance
-                            let distance = abs(c - col)
-                            // Influence is 2 at distance 1, 1 at distance 2, 0 beyond
-                            var influence = 0
-                            if distance == 1 {
-                                influence = 2 * magnetValue
-                            } else if distance == 2 {
-                                influence = 1 * magnetValue
-                            }
-                            
-                            fieldValues[row][c] += influence
-                        }
-                    }
-                    
-                    // Affect the column
-                    for r in 0..<gridSize {
-                        if r != row {
-                            // Calculate distance
-                            let distance = abs(r - row)
-                            // Influence is 2 at distance 1, 1 at distance 2, 0 beyond
-                            var influence = 0
-                            if distance == 1 {
-                                influence = 2 * magnetValue
-                            } else if distance == 2 {
-                                influence = 1 * magnetValue
-                            }
-                            
-                            fieldValues[r][col] += influence
-                        }
-                    }
+                availablePositions.append((row: row, col: col))
+            }
+        }
+        
+        // Shuffle positions
+        availablePositions.shuffle()
+        
+        // Place positive magnets
+        for i in 0..<positiveMagnets {
+            if i < availablePositions.count {
+                let pos = availablePositions[i]
+                solution[pos.row][pos.col] = 1
+            }
+        }
+        
+        // Place negative magnets
+        for i in 0..<negativeMagnets {
+            let index = positiveMagnets + i
+            if index < availablePositions.count {
+                let pos = availablePositions[index]
+                solution[pos.row][pos.col] = -1
+            }
+        }
+        
+        return solution
+    }
+    
+    // MARK: - Field Calculation
+    private static func calculateFieldValues(
+        solution: [[Int]],
+        gridSize: Int,
+        calculator: FieldCalculator
+    ) -> [[Int]] {
+        
+        // Initial charges are all zero for puzzle generation
+        let initialCharges = Array(
+            repeating: Array(repeating: 0, count: gridSize),
+            count: gridSize
+        )
+        
+        return calculator.calculateAllFieldValues(
+            initialCharges: initialCharges,
+            magnets: solution
+        )
+    }
+    
+    // MARK: - Target Cell Selection
+    private static func selectTargetCells(
+        fieldValues: [[Int]],
+        targetCount: Int,
+        strategy: DifficultyConfig.PlacementStrategy,
+        gridSize: Int
+    ) -> [[Int]] {
+        
+        var initialCharges = Array(
+            repeating: Array(repeating: 0, count: gridSize),
+            count: gridSize
+        )
+        
+        switch strategy {
+        case .even:
+            selectEvenlyDistributedTargets(
+                initialCharges: &initialCharges,
+                fieldValues: fieldValues,
+                count: targetCount,
+                gridSize: gridSize
+            )
+            
+        case .clustered:
+            selectClusteredTargets(
+                initialCharges: &initialCharges,
+                fieldValues: fieldValues,
+                count: targetCount,
+                gridSize: gridSize
+            )
+            
+        case .mixed:
+            selectMixedTargets(
+                initialCharges: &initialCharges,
+                fieldValues: fieldValues,
+                count: targetCount,
+                gridSize: gridSize
+            )
+        }
+        
+        return initialCharges
+    }
+    
+    // MARK: - Selection Strategies
+    
+    private static func selectEvenlyDistributedTargets(
+        initialCharges: inout [[Int]],
+        fieldValues: [[Int]],
+        count: Int,
+        gridSize: Int
+    ) {
+        // Divide grid into regions
+        let regions = min(3, gridSize - 1)
+        let cellsPerRegion = (count / (regions * regions)) + 1
+        
+        var regionCounts = Array(
+            repeating: Array(repeating: 0, count: regions),
+            count: regions
+        )
+        
+        // Get all non-zero positions
+        var candidates: [(row: Int, col: Int, value: Int)] = []
+        for row in 0..<gridSize {
+            for col in 0..<gridSize {
+                if fieldValues[row][col] != 0 {
+                    candidates.append((row, col, fieldValues[row][col]))
                 }
             }
         }
         
-        return fieldValues
-    }
-    
-    // MARK: - Target Cell Selection Strategies
-    
-    // Select cells evenly distributed across the grid (easier puzzles)
-    private static func selectEvenlyDistributedTargets(initialCharges: inout [[Int]], fieldValues: [[Int]], count: Int, gridSize: Int) {
-        // Create a list of all cell positions
-        var allPositions: [(row: Int, col: Int)] = []
-        for row in 0..<gridSize {
-            for col in 0..<gridSize {
-                allPositions.append((row: row, col: col))
-            }
-        }
-        
-        // Shuffle all positions for randomness
-        allPositions.shuffle()
-        
-        // Divide grid into regions to ensure distribution
-        let regions = min(3, gridSize - 1) // Number of regions to create (e.g., 3x3 for 5x5 grid)
-        var regionMap = Array(repeating: Array(repeating: 0, count: regions), count: regions)
-        let maxPerRegion = (count / (regions * regions)) + 1
+        // Shuffle for randomness
+        candidates.shuffle()
         
         var selectedCount = 0
         
-        // First pass: try to distribute evenly
-        for position in allPositions {
-            // Calculate which region this position belongs to
-            let regionRow = min(Int(Double(position.row) / Double(gridSize) * Double(regions)), regions - 1)
-            let regionCol = min(Int(Double(position.col) / Double(gridSize) * Double(regions)), regions - 1)
+        // First pass: distribute evenly across regions
+        for candidate in candidates {
+            let regionRow = min(candidate.row * regions / gridSize, regions - 1)
+            let regionCol = min(candidate.col * regions / gridSize, regions - 1)
             
-            // If this region has room for more targets
-            if regionMap[regionRow][regionCol] < maxPerRegion {
-                initialCharges[position.row][position.col] = fieldValues[position.row][position.col]
-                regionMap[regionRow][regionCol] += 1
+            if regionCounts[regionRow][regionCol] < cellsPerRegion {
+                initialCharges[candidate.row][candidate.col] = candidate.value
+                regionCounts[regionRow][regionCol] += 1
                 selectedCount += 1
                 
-                if selectedCount >= count {
-                    break
-                }
+                if selectedCount >= count { break }
             }
         }
         
-        // Second pass if needed: fill remaining slots
+        // Second pass: fill remaining slots
         if selectedCount < count {
-            for position in allPositions {
-                if initialCharges[position.row][position.col] == 0 { // Not yet assigned
-                    initialCharges[position.row][position.col] = fieldValues[position.row][position.col]
+            for candidate in candidates {
+                if initialCharges[candidate.row][candidate.col] == 0 {
+                    initialCharges[candidate.row][candidate.col] = candidate.value
                     selectedCount += 1
                     
-                    if selectedCount >= count {
-                        break
-                    }
+                    if selectedCount >= count { break }
                 }
             }
         }
     }
     
-    // Select cells with some clustering (harder puzzles)
-    private static func selectClusteredTargets(initialCharges: inout [[Int]], fieldValues: [[Int]], count: Int, gridSize: Int) {
+    private static func selectClusteredTargets(
+        initialCharges: inout [[Int]],
+        fieldValues: [[Int]],
+        count: Int,
+        gridSize: Int
+    ) {
         // Select 1-2 cluster centers
-        let clusterCount = 1 + (count > 10 ? 1 : 0)
+        let clusterCount = count > 10 ? 2 : 1
         var clusterCenters: [(row: Int, col: Int)] = []
         
         for _ in 0..<clusterCount {
-            let centerRow = Int.random(in: 0..<gridSize)
-            let centerCol = Int.random(in: 0..<gridSize)
-            clusterCenters.append((row: centerRow, col: centerCol))
+            clusterCenters.append((
+                row: Int.random(in: 0..<gridSize),
+                col: Int.random(in: 0..<gridSize)
+            ))
         }
         
-        // Create a list of all positions with their distances to the nearest cluster
-        var positionsWithDistances: [(position: (row: Int, col: Int), distance: Int)] = []
+        // Get all non-zero positions with distances
+        var candidates: [(position: (row: Int, col: Int), value: Int, distance: Int)] = []
         
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                let position = (row: row, col: col)
-                
-                // Find minimum distance to any cluster center
-                var minDistance = Int.max
-                for center in clusterCenters {
-                    let distance = abs(row - center.row) + abs(col - center.col) // Manhattan distance
-                    minDistance = min(minDistance, distance)
+                if fieldValues[row][col] != 0 {
+                    // Find minimum Manhattan distance to any cluster
+                    var minDistance = Int.max
+                    for center in clusterCenters {
+                        let distance = abs(row - center.row) + abs(col - center.col)
+                        minDistance = min(minDistance, distance)
+                    }
+                    
+                    candidates.append((
+                        position: (row, col),
+                        value: fieldValues[row][col],
+                        distance: minDistance
+                    ))
                 }
-                
-                positionsWithDistances.append((position: position, distance: minDistance))
             }
         }
         
         // Sort by distance (closest first)
-        positionsWithDistances.sort { $0.distance < $1.distance }
+        candidates.sort { $0.distance < $1.distance }
         
-        // Select cells, with some randomness
+        // Select cells with some randomness
         var selectedCount = 0
-        for entry in positionsWithDistances {
-            // Add some randomness to avoid perfect clusters
-            if Double.random(in: 0...1) > 0.2 || selectedCount < count / 2 { // Ensure we select at least half the required count
-                let row = entry.position.row
-                let col = entry.position.col
+        for candidate in candidates {
+            if Double.random(in: 0...1) > 0.2 || selectedCount < count / 2 {
+                initialCharges[candidate.position.row][candidate.position.col] = candidate.value
+                selectedCount += 1
                 
-                if initialCharges[row][col] == 0 { // Not yet assigned
-                    initialCharges[row][col] = fieldValues[row][col]
-                    selectedCount += 1
-                    
-                    if selectedCount >= count {
-                        break
-                    }
-                }
+                if selectedCount >= count { break }
             }
         }
         
-        // Fill any remaining slots
+        // Fill remaining if needed
         if selectedCount < count {
-            for entry in positionsWithDistances {
-                let row = entry.position.row
-                let col = entry.position.col
-                
-                if initialCharges[row][col] == 0 { // Not yet assigned
-                    initialCharges[row][col] = fieldValues[row][col]
+            for candidate in candidates {
+                if initialCharges[candidate.position.row][candidate.position.col] == 0 {
+                    initialCharges[candidate.position.row][candidate.position.col] = candidate.value
                     selectedCount += 1
                     
-                    if selectedCount >= count {
-                        break
-                    }
+                    if selectedCount >= count { break }
                 }
             }
         }
     }
     
-    // Balanced approach, including some key cells
-    private static func selectBalancedTargets(initialCharges: inout [[Int]], fieldValues: [[Int]], count: Int, gridSize: Int) {
-        // Create a list of all positions
-        var allPositions: [(row: Int, col: Int, value: Int)] = []
+    private static func selectMixedTargets(
+        initialCharges: inout [[Int]],
+        fieldValues: [[Int]],
+        count: Int,
+        gridSize: Int
+    ) {
+        // Get all non-zero positions
+        var candidates: [(row: Int, col: Int, value: Int)] = []
         for row in 0..<gridSize {
             for col in 0..<gridSize {
-                allPositions.append((row: row, col: col, value: fieldValues[row][col]))
-            }
-        }
-        
-        // First, include some cells with extreme values (highest absolute values)
-        let extremeValueCount = min(count / 3, 3) // Up to 1/3 of count or 3, whichever is smaller
-        
-        // Sort by absolute value, highest first
-        let sortedByAbsValue = allPositions.sorted { abs($0.value) > abs($1.value) }
-        
-        var selectedCount = 0
-        
-        // Add extreme values first
-        for position in sortedByAbsValue.prefix(extremeValueCount) {
-            initialCharges[position.row][position.col] = position.value
-            selectedCount += 1
-        }
-        
-        // Then add some cells with zero or near-zero values
-        let neutralValueCount = min(count / 4, 2) // Up to 1/4 of count or 2, whichever is smaller
-        let sortedByValue = allPositions.sorted { abs($0.value) < abs($1.value) }
-        
-        for position in sortedByValue.prefix(neutralValueCount) {
-            if initialCharges[position.row][position.col] == 0 { // Not yet assigned
-                initialCharges[position.row][position.col] = position.value
-                selectedCount += 1
-            }
-        }
-        
-        // Fill the rest with a mix of positions
-        var remainingPositions = allPositions.filter { initialCharges[$0.row][$0.col] == 0 }
-        remainingPositions.shuffle()
-        
-        for position in remainingPositions {
-            if initialCharges[position.row][position.col] == 0 { // Not yet assigned
-                initialCharges[position.row][position.col] = position.value
-                selectedCount += 1
-                
-                if selectedCount >= count {
-                    break
+                if fieldValues[row][col] != 0 {
+                    candidates.append((row, col, fieldValues[row][col]))
                 }
             }
         }
+        
+        // Sort by absolute value (highest first)
+        candidates.sort { abs($0.value) > abs($1.value) }
+        
+        var selectedCount = 0
+        
+        // First, include some extreme values
+        let extremeCount = min(count / 3, 3)
+        for i in 0..<min(extremeCount, candidates.count) {
+            let candidate = candidates[i]
+            initialCharges[candidate.row][candidate.col] = candidate.value
+            selectedCount += 1
+        }
+        
+        // Then add some low values
+        let lowValueCandidates = candidates.filter { abs($0.value) <= 2 }
+        let lowCount = min(count / 4, lowValueCandidates.count)
+        
+        for i in 0..<lowCount {
+            let candidate = lowValueCandidates[i]
+            if initialCharges[candidate.row][candidate.col] == 0 {
+                initialCharges[candidate.row][candidate.col] = candidate.value
+                selectedCount += 1
+            }
+        }
+        
+        // Fill the rest randomly
+        candidates.shuffle()
+        for candidate in candidates {
+            if selectedCount >= count { break }
+            
+            if initialCharges[candidate.row][candidate.col] == 0 {
+                initialCharges[candidate.row][candidate.col] = candidate.value
+                selectedCount += 1
+            }
+        }
+    }
+}
+
+// MARK: - Puzzle Validator
+extension PuzzleGenerator {
+    
+    /// Validates that a puzzle has a valid solution
+    static func validatePuzzle(_ puzzle: PuzzleDefinition) -> Bool {
+        // Create a field calculator
+        let calculator = FieldCalculatorFactory.getCalculator(for: puzzle.gridSize)
+        
+        // Calculate what the field would be with the solution
+        let fieldWithSolution = calculator.calculateAllFieldValues(
+            initialCharges: puzzle.initialCharges,
+            magnets: puzzle.solution
+        )
+        
+        // Check if all target cells are neutralized
+        for row in 0..<puzzle.gridSize {
+            for col in 0..<puzzle.gridSize {
+                if puzzle.initialCharges[row][col] != 0 {
+                    // This is a target cell - it should be neutralized
+                    if fieldWithSolution[row][col] != 0 {
+                        return false
+                    }
+                }
+            }
+        }
+        
+        return true
+    }
+    
+    /// Calculates puzzle difficulty score
+    static func calculateDifficultyScore(_ puzzle: PuzzleDefinition) -> Float {
+        var score: Float = 0
+        
+        // Factor 1: Number of target cells (fewer = harder)
+        let targetCellCount = puzzle.initialCharges.flatMap { $0 }.filter { $0 != 0 }.count
+        let totalCells = puzzle.gridSize * puzzle.gridSize
+        score += Float(totalCells - targetCellCount) / Float(totalCells) * 30
+        
+        // Factor 2: Average absolute value of targets (higher = harder)
+        let targetValues = puzzle.initialCharges.flatMap { $0 }.filter { $0 != 0 }
+        if !targetValues.isEmpty {
+            let avgValue = Float(targetValues.map { abs($0) }.reduce(0, +)) / Float(targetValues.count)
+            score += min(avgValue * 5, 30)
+        }
+        
+        // Factor 3: Clustering of targets (more clustered = harder)
+        score += calculateClusteringScore(puzzle.initialCharges) * 20
+        
+        // Factor 4: Solution complexity (more magnets used = harder)
+        let magnetsUsed = puzzle.solution.flatMap { $0 }.filter { $0 != 0 }.count
+        let maxMagnets = puzzle.positiveMagnets + puzzle.negativeMagnets
+        score += Float(magnetsUsed) / Float(maxMagnets) * 20
+        
+        return min(max(score, 0), 100) // Clamp to 0-100
+    }
+    
+    private static func calculateClusteringScore(_ grid: [[Int]]) -> Float {
+        var clusterScore: Float = 0
+        let nonZeroCells = grid.enumerated().flatMap { row in
+            row.element.enumerated().compactMap { col in
+                col.element != 0 ? (row: row.offset, col: col.offset) : nil
+            }
+        }
+        
+        guard nonZeroCells.count > 1 else { return 0 }
+        
+        // Calculate average distance between non-zero cells
+        var totalDistance = 0
+        var pairCount = 0
+        
+        for i in 0..<nonZeroCells.count {
+            for j in (i+1)..<nonZeroCells.count {
+                let distance = abs(nonZeroCells[i].row - nonZeroCells[j].row) +
+                               abs(nonZeroCells[i].col - nonZeroCells[j].col)
+                totalDistance += distance
+                pairCount += 1
+            }
+        }
+        
+        let avgDistance = Float(totalDistance) / Float(pairCount)
+        let maxDistance = Float(grid.count * 2) // Maximum possible distance
+        
+        // Lower average distance = more clustered = higher score
+        clusterScore = 1.0 - (avgDistance / maxDistance)
+        
+        return clusterScore
     }
 }
