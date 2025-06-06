@@ -8,12 +8,13 @@
 import UIKit
 
 // MARK: - Directory System
-enum DirectoryPath: String, CaseIterable {
+enum DirectoryPath: String, CaseIterable, Codable {
     case root = "~"
     case training = "~/training"
     case assignments = "~/assignments"
     case special = "~/special"
     case archived = "~/archived"
+    case catalog = "~/catalog"
     
     // Hidden directories (discoverable through clues)
     case classified = "~/classified"
@@ -28,6 +29,7 @@ enum DirectoryPath: String, CaseIterable {
         case .assignments: return "Field Assignments"
         case .special: return "Special Operations"
         case .archived: return "Completed Missions"
+        case .catalog: return "Directory Catalog"
         case .classified: return "Classified Files"
         case .project_alpha: return "Project Alpha"
         case .maintenance: return "System Maintenance"
@@ -82,6 +84,7 @@ enum TerminalCommand {
                 case "assignments": return .changeDirectory(.assignments)
                 case "special": return .changeDirectory(.special)
                 case "archived": return .changeDirectory(.archived)
+                case "catalog": return .changeDirectory(.catalog)
                 // Hidden directories
                 case "classified": return .changeDirectory(.classified)
                 case "project_alpha": return .changeDirectory(.project_alpha)
@@ -110,9 +113,12 @@ class DashboardViewController: UIViewController {
     
     // MARK: - Properties
     private let progress = GameProgressManager.shared
+    private let discoveryManager = DirectoryDiscoveryManager.shared
     private var assignmentButtons: [UIButton] = []
     private var currentDirectory: DirectoryPath = .root
     private var terminalHistory: [String] = []
+    private var floatingCommandView: UIView?
+    private var isCommandFloating = false
     
     // MARK: - UI Elements
     private let titleView = UIView()
@@ -228,13 +234,25 @@ class DashboardViewController: UIViewController {
     }
     
     private func setupTerminalInterface() {
-        // Terminal prompt view (shows current directory)
+        // Terminal prompt view (shows current directory) - MAKE IT CLEARLY DIFFERENT
         terminalPromptView.translatesAutoresizingMaskIntoConstraints = false
-        TerminalTheme.styleContainer(terminalPromptView, borderOpacity: 0.5)
+        terminalPromptView.backgroundColor = TerminalTheme.Colors.backgroundBlack.withAlphaComponent(0.3)
+        terminalPromptView.layer.cornerRadius = 6
+        terminalPromptView.layer.borderWidth = 1
+        terminalPromptView.layer.borderColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.3).cgColor
         view.addSubview(terminalPromptView)
+        
+        // Add "READ ONLY" indicator
+        let readOnlyIcon = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        readOnlyIcon.image = UIImage(systemName: "eye", withConfiguration: config)
+        readOnlyIcon.tintColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.6)
+        readOnlyIcon.translatesAutoresizingMaskIntoConstraints = false
+        terminalPromptView.addSubview(readOnlyIcon)
         
         // Current path label
         currentPathLabel.style = .terminal
+        currentPathLabel.alpha = 0.8
         currentPathLabel.translatesAutoresizingMaskIntoConstraints = false
         terminalPromptView.addSubview(currentPathLabel)
         
@@ -258,8 +276,11 @@ class DashboardViewController: UIViewController {
             terminalPromptView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             terminalPromptView.heightAnchor.constraint(equalToConstant: 40),
             
+            readOnlyIcon.leadingAnchor.constraint(equalTo: terminalPromptView.leadingAnchor, constant: 15),
+            readOnlyIcon.centerYAnchor.constraint(equalTo: terminalPromptView.centerYAnchor),
+            
+            currentPathLabel.leadingAnchor.constraint(equalTo: readOnlyIcon.trailingAnchor, constant: 8),
             currentPathLabel.centerYAnchor.constraint(equalTo: terminalPromptView.centerYAnchor),
-            currentPathLabel.leadingAnchor.constraint(equalTo: terminalPromptView.leadingAnchor, constant: 15),
             currentPathLabel.trailingAnchor.constraint(equalTo: terminalPromptView.trailingAnchor, constant: -15),
             
             scrollView.topAnchor.constraint(equalTo: terminalPromptView.bottomAnchor, constant: 15),
@@ -282,68 +303,120 @@ class DashboardViewController: UIViewController {
     
     private func setupCommandInput() {
         commandInputView.translatesAutoresizingMaskIntoConstraints = false
-        TerminalTheme.styleContainer(commandInputView)
+        commandInputView.backgroundColor = TerminalTheme.Colors.backgroundBlack
+        commandInputView.layer.cornerRadius = 12
+        commandInputView.layer.borderWidth = 2
+        commandInputView.layer.borderColor = TerminalTheme.Colors.primaryGreen.cgColor
+        
+        // Add glow effect to make it more prominent
+        commandInputView.layer.shadowColor = TerminalTheme.Colors.primaryGreen.cgColor
+        commandInputView.layer.shadowOffset = CGSize.zero
+        commandInputView.layer.shadowRadius = 8
+        commandInputView.layer.shadowOpacity = 0.3
+        
         view.addSubview(commandInputView)
         
-        // Add tap gesture to entire input view to focus text field
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(focusCommandInput))
-        commandInputView.addGestureRecognizer(tapGesture)
+        // Make the entire view a button
+        let tapButton = UIButton(type: .system)
+        tapButton.backgroundColor = .clear
+        tapButton.addTarget(self, action: #selector(focusCommandInput), for: .touchUpInside)
+        tapButton.translatesAutoresizingMaskIntoConstraints = false
+        commandInputView.addSubview(tapButton)
         
-        // Command prompt
-        let promptLabel = TerminalLabel()
-        promptLabel.style = .terminal
-        promptLabel.text = "$"
-        promptLabel.translatesAutoresizingMaskIntoConstraints = false
-        commandInputView.addSubview(promptLabel)
+        // Terminal icon
+        let terminalIcon = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        terminalIcon.image = UIImage(systemName: "terminal", withConfiguration: config)
+        terminalIcon.tintColor = TerminalTheme.Colors.primaryGreen
+        terminalIcon.translatesAutoresizingMaskIntoConstraints = false
+        commandInputView.addSubview(terminalIcon)
         
-        // Text field
-        commandTextField.backgroundColor = .clear
-        commandTextField.textColor = TerminalTheme.Colors.primaryGreen
-        commandTextField.font = TerminalTheme.Fonts.monospaced(size: 14)
-        commandTextField.textAlignment = .left
-        commandTextField.contentVerticalAlignment = .center
-        commandTextField.borderStyle = .none
-        commandTextField.autocorrectionType = .no
-        commandTextField.autocapitalizationType = .none
+        // Main label
+        let mainLabel = TerminalLabel()
+        mainLabel.style = .body
+        mainLabel.text = "Open Terminal"
+        mainLabel.font = TerminalTheme.Fonts.monospaced(size: 16, weight: .bold)
+        mainLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandInputView.addSubview(mainLabel)
         
-        // Make placeholder more visible
-        let placeholderText = "Type 'help' for commands"
-        commandTextField.attributedPlaceholder = NSAttributedString(
-            string: placeholderText,
-            attributes: [
-                NSAttributedString.Key.foregroundColor: TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.6),
-                NSAttributedString.Key.font: TerminalTheme.Fonts.monospaced(size: 14)
-            ]
-        )
+        // Subtitle
+        let subtitleLabel = TerminalLabel()
+        subtitleLabel.style = .caption
+        subtitleLabel.text = "Tap to enter commands"
+        subtitleLabel.alpha = 0.7
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandInputView.addSubview(subtitleLabel)
         
-        commandTextField.delegate = self
-        commandTextField.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Ensure no internal padding
-        commandTextField.leftView = nil
-        commandTextField.rightView = nil
-        commandTextField.clearButtonMode = .never
-        
-        commandInputView.addSubview(commandTextField)
+        // Keyboard shortcut hint
+        let shortcutLabel = TerminalLabel()
+        shortcutLabel.style = .caption
+        shortcutLabel.text = "⌘T"
+        shortcutLabel.textAlignment = .center
+        shortcutLabel.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.2)
+        shortcutLabel.layer.cornerRadius = 6
+        shortcutLabel.layer.borderWidth = 1
+        shortcutLabel.layer.borderColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.5).cgColor
+        shortcutLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandInputView.addSubview(shortcutLabel)
         
         NSLayoutConstraint.activate([
             commandInputView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             commandInputView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             commandInputView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            commandInputView.heightAnchor.constraint(equalToConstant: 50),
+            commandInputView.heightAnchor.constraint(equalToConstant: 70),
             
-            promptLabel.leadingAnchor.constraint(equalTo: commandInputView.leadingAnchor, constant: 15),
-            promptLabel.centerYAnchor.constraint(equalTo: commandInputView.centerYAnchor),
+            tapButton.topAnchor.constraint(equalTo: commandInputView.topAnchor),
+            tapButton.leadingAnchor.constraint(equalTo: commandInputView.leadingAnchor),
+            tapButton.trailingAnchor.constraint(equalTo: commandInputView.trailingAnchor),
+            tapButton.bottomAnchor.constraint(equalTo: commandInputView.bottomAnchor),
             
-            commandTextField.leadingAnchor.constraint(equalTo: promptLabel.trailingAnchor, constant: 5),
-            commandTextField.trailingAnchor.constraint(equalTo: commandInputView.trailingAnchor, constant: -15),
-            commandTextField.topAnchor.constraint(equalTo: commandInputView.topAnchor, constant: 5),
-            commandTextField.bottomAnchor.constraint(equalTo: commandInputView.bottomAnchor, constant: -5)
+            terminalIcon.leadingAnchor.constraint(equalTo: commandInputView.leadingAnchor, constant: 20),
+            terminalIcon.centerYAnchor.constraint(equalTo: commandInputView.centerYAnchor),
+            terminalIcon.widthAnchor.constraint(equalToConstant: 24),
+            terminalIcon.heightAnchor.constraint(equalToConstant: 24),
+            
+            mainLabel.leadingAnchor.constraint(equalTo: terminalIcon.trailingAnchor, constant: 15),
+            mainLabel.topAnchor.constraint(equalTo: commandInputView.topAnchor, constant: 15),
+            
+            subtitleLabel.leadingAnchor.constraint(equalTo: mainLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: mainLabel.bottomAnchor, constant: 4),
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: shortcutLabel.leadingAnchor, constant: -10),
+            
+            shortcutLabel.trailingAnchor.constraint(equalTo: commandInputView.trailingAnchor, constant: -20),
+            shortcutLabel.centerYAnchor.constraint(equalTo: commandInputView.centerYAnchor),
+            shortcutLabel.widthAnchor.constraint(equalToConstant: 32),
+            shortcutLabel.heightAnchor.constraint(equalToConstant: 24)
         ])
+        
+        // Add press animation
+        addButtonPressAnimation(to: tapButton, containerView: commandInputView)
+    }
+    
+    private func addButtonPressAnimation(to button: UIButton, containerView: UIView) {
+        button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    @objc private func buttonTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            self.commandInputView.transform = CGAffineTransform(scaleX: 0.97, y: 0.97)
+            self.commandInputView.alpha = 0.8
+        }
+    }
+    
+    @objc private func buttonTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            self.commandInputView.transform = .identity
+            self.commandInputView.alpha = 1.0
+        }
     }
     
     @objc private func focusCommandInput() {
-        commandTextField.becomeFirstResponder()
+        if isCommandFloating {
+            dismissFloatingCommand()
+        } else {
+            createFloatingCommandInterface()
+        }
     }
     
     private func setupFixedMessagesButton() {
@@ -401,13 +474,220 @@ class DashboardViewController: UIViewController {
         updateMessagesBadge()
     }
     
+    // MARK: - Floating Command Interface
+    private func createFloatingCommandInterface() {
+        guard floatingCommandView == nil else { return }
+        
+        // Create semi-transparent overlay
+        let overlayView = UIView(frame: view.bounds)
+        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        overlayView.alpha = 0
+        
+        // Add tap gesture to dismiss
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissFloatingCommand))
+        overlayView.addGestureRecognizer(tapGesture)
+        
+        view.addSubview(overlayView)
+        
+        // Create floating command container
+        let commandContainer = TerminalContainerView()
+        commandContainer.translatesAutoresizingMaskIntoConstraints = false
+        commandContainer.layer.shadowColor = TerminalTheme.Colors.primaryGreen.cgColor
+        commandContainer.layer.shadowOffset = CGSize.zero
+        commandContainer.layer.shadowRadius = 15
+        commandContainer.layer.shadowOpacity = 0.5
+        overlayView.addSubview(commandContainer)
+        
+        // Terminal header
+        let headerLabel = TerminalLabel()
+        headerLabel.style = .terminal
+        headerLabel.text = "employee@neutratech:\(currentDirectory.rawValue)$ "
+        headerLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandContainer.addSubview(headerLabel)
+        
+        // Favorites section
+        var topAnchor = headerLabel.bottomAnchor
+        let favorites = discoveryManager.getFavorites()
+        
+        if !favorites.isEmpty {
+            let favoritesLabel = TerminalLabel()
+            favoritesLabel.style = .caption
+            favoritesLabel.text = "Quick Navigation (\(favorites.count)/\(discoveryManager.getMaxFavorites())):"
+            favoritesLabel.translatesAutoresizingMaskIntoConstraints = false
+            commandContainer.addSubview(favoritesLabel)
+            
+            let favoritesStack = createFavoritesStack(favorites: favorites)
+            commandContainer.addSubview(favoritesStack)
+            
+            NSLayoutConstraint.activate([
+                favoritesLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 15),
+                favoritesLabel.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+                favoritesLabel.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15),
+                
+                favoritesStack.topAnchor.constraint(equalTo: favoritesLabel.bottomAnchor, constant: 8),
+                favoritesStack.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+                favoritesStack.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15)
+            ])
+            
+            topAnchor = favoritesStack.bottomAnchor
+        }
+        
+        // Command input field
+        let floatingTextField = UITextField()
+        floatingTextField.backgroundColor = .clear
+        floatingTextField.textColor = TerminalTheme.Colors.primaryGreen
+        floatingTextField.font = TerminalTheme.Fonts.monospaced(size: 16, weight: .bold)
+        floatingTextField.borderStyle = .none
+        floatingTextField.autocorrectionType = .no
+        floatingTextField.autocapitalizationType = .none
+        floatingTextField.delegate = self
+        floatingTextField.tag = 999 // Special tag to identify floating text field
+        floatingTextField.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Enhanced placeholder
+        floatingTextField.attributedPlaceholder = NSAttributedString(
+            string: "Enter terminal command...",
+            attributes: [
+                NSAttributedString.Key.foregroundColor: TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.6),
+                NSAttributedString.Key.font: TerminalTheme.Fonts.monospaced(size: 16)
+            ]
+        )
+        
+        commandContainer.addSubview(floatingTextField)
+        
+        // Help text
+        let helpLabel = TerminalLabel()
+        helpLabel.style = .caption
+        helpLabel.text = "Type 'help' for commands • Tap outside to close"
+        helpLabel.textAlignment = .center
+        helpLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandContainer.addSubview(helpLabel)
+        
+        // Command history preview (last 3 commands)
+        var bottomAnchor = helpLabel.bottomAnchor
+        if !terminalHistory.isEmpty {
+            let historyLabel = TerminalLabel()
+            historyLabel.style = .caption
+            historyLabel.numberOfLines = 3
+            historyLabel.text = terminalHistory.suffix(3).joined(separator: "\n")
+            historyLabel.alpha = 0.7
+            historyLabel.translatesAutoresizingMaskIntoConstraints = false
+            commandContainer.addSubview(historyLabel)
+            
+            NSLayoutConstraint.activate([
+                historyLabel.topAnchor.constraint(equalTo: helpLabel.bottomAnchor, constant: 15),
+                historyLabel.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+                historyLabel.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15)
+            ])
+            
+            bottomAnchor = historyLabel.bottomAnchor
+        }
+        
+        NSLayoutConstraint.activate([
+            commandContainer.centerXAnchor.constraint(equalTo: overlayView.centerXAnchor),
+            commandContainer.topAnchor.constraint(equalTo: overlayView.safeAreaLayoutGuide.topAnchor, constant: 80),
+            commandContainer.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor, constant: 30),
+            commandContainer.trailingAnchor.constraint(equalTo: overlayView.trailingAnchor, constant: -30),
+            
+            headerLabel.topAnchor.constraint(equalTo: commandContainer.topAnchor, constant: 15),
+            headerLabel.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+            headerLabel.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15),
+            
+            floatingTextField.topAnchor.constraint(equalTo: topAnchor, constant: 15),
+            floatingTextField.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+            floatingTextField.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15),
+            floatingTextField.heightAnchor.constraint(equalToConstant: 44),
+            
+            helpLabel.topAnchor.constraint(equalTo: floatingTextField.bottomAnchor, constant: 15),
+            helpLabel.leadingAnchor.constraint(equalTo: commandContainer.leadingAnchor, constant: 15),
+            helpLabel.trailingAnchor.constraint(equalTo: commandContainer.trailingAnchor, constant: -15),
+            
+            bottomAnchor.constraint(equalTo: commandContainer.bottomAnchor, constant: -15)
+        ])
+        
+        floatingCommandView = overlayView
+        
+        // Animate in
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            overlayView.alpha = 1
+            commandContainer.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.1) {
+                commandContainer.transform = .identity
+            }
+            floatingTextField.becomeFirstResponder()
+        }
+        
+        isCommandFloating = true
+    }
+    
+    private func createFavoritesStack(favorites: [DirectoryMetadata]) -> UIStackView {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.distribution = .fillEqually
+        stackView.spacing = 8
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        
+        for favorite in favorites.prefix(5) {
+            let button = createFavoriteChip(for: favorite)
+            stackView.addArrangedSubview(button)
+        }
+        
+        return stackView
+    }
+    
+    private func createFavoriteChip(for metadata: DirectoryMetadata) -> UIButton {
+        let button = UIButton(type: .system)
+        
+        let displayText = metadata.specialIcon.map { "\($0) " } ?? ""
+        button.setTitle("\(displayText)\(metadata.path.displayName)", for: .normal)
+        button.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 12, weight: .medium)
+        button.setTitleColor(TerminalTheme.Colors.primaryGreen, for: .normal)
+        button.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 16
+        button.layer.borderWidth = 1
+        button.layer.borderColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.3).cgColor
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        
+        button.addAction(UIAction { [weak self] _ in
+            self?.navigateToDirectory(metadata.path)
+            self?.dismissFloatingCommand()
+        }, for: .touchUpInside)
+        
+        return button
+    }
+    
+    @objc private func dismissFloatingCommand() {
+        guard let floatingView = floatingCommandView else { return }
+        
+        UIView.animate(withDuration: 0.2, animations: {
+            floatingView.alpha = 0
+            if let container = floatingView.subviews.first(where: { $0 is TerminalContainerView }) {
+                container.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            }
+        }) { _ in
+            floatingView.removeFromSuperview()
+            self.floatingCommandView = nil
+            self.isCommandFloating = false
+        }
+    }
+    
     // MARK: - Directory Management
     private func updateCurrentDirectory() {
+        // Track directory visit
+        discoveryManager.discoverDirectory(currentDirectory)
+        
         // Update path display
         currentPathLabel.text = "employee@neutratech:\(currentDirectory.rawValue)$ "
         
         // Update directory contents
         updateDirectoryContents()
+    }
+    
+    private func navigateToDirectory(_ directory: DirectoryPath) {
+        currentDirectory = directory
+        updateCurrentDirectory()
+        appendToHistory("Changed to \(directory.displayName)")
     }
     
     private func updateDirectoryContents() {
@@ -422,6 +702,8 @@ class DashboardViewController: UIViewController {
             showSpecialDirectory()
         case .archived:
             showArchivedDirectory()
+        case .catalog:
+            showCatalogDirectory()
         case .classified:
             showClassifiedDirectory()
         case .project_alpha:
@@ -454,6 +736,157 @@ class DashboardViewController: UIViewController {
         // Clear assignment buttons
         clearAssignmentButtons()
     }
+    
+    private func showCatalogDirectory() {
+        clearAssignmentButtons()
+        
+        let discovered = discoveryManager.getAllDiscovered()
+        let totalDiscovered = discoveryManager.getTotalDiscovered()
+        let hiddenDiscovered = discoveryManager.getTotalHiddenDiscovered()
+        let favoritesCount = discoveryManager.getFavoritesCount()
+        let maxFavorites = discoveryManager.getMaxFavorites()
+        
+        var content = "📚 DIRECTORY CATALOG\n\n"
+        content += "Discovered: \(totalDiscovered) directories"
+        if hiddenDiscovered > 0 {
+            content += " (\(hiddenDiscovered) classified)"
+        }
+        content += "\nFavorites: \(favoritesCount)/\(maxFavorites)\n\n"
+        
+        if discovered.isEmpty {
+            content += "No directories discovered yet.\n"
+            content += "Navigate around to catalog your exploration!"
+            directoryContentsLabel.text = content
+        } else {
+            content += "Tap ★ to favorite • Tap → to navigate"
+            directoryContentsLabel.text = content
+            
+            // Create interactive buttons for each directory
+            displayCatalogButtons(discovered)
+        }
+    }
+    
+    private func displayCatalogButtons(_ directories: [DirectoryMetadata]) {
+        var previousButton: UIView?
+        let buttonHeight: CGFloat = 85 // Increased height for better layout
+        let buttonSpacing: CGFloat = 12
+        
+        for directory in directories {
+            let button = createCatalogButton(for: directory)
+            contentView.addSubview(button)
+            assignmentButtons.append(button) // Reuse this array for cleanup
+            
+            // Set constraints
+            if let previous = previousButton {
+                button.topAnchor.constraint(equalTo: previous.bottomAnchor, constant: buttonSpacing).isActive = true
+            } else {
+                button.topAnchor.constraint(equalTo: directoryContentsLabel.bottomAnchor, constant: 20).isActive = true
+            }
+            
+            NSLayoutConstraint.activate([
+                button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+                button.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+                button.heightAnchor.constraint(equalToConstant: buttonHeight)
+            ])
+            
+            previousButton = button
+        }
+        
+        // Update content size
+        if let lastButton = assignmentButtons.last {
+            lastButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20).isActive = true
+        }
+    }
+    
+    private func createCatalogButton(for metadata: DirectoryMetadata) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        TerminalTheme.styleContainer(button, borderOpacity: metadata.isFavorite ? 1.0 : 0.5)
+        if metadata.isFavorite {
+            button.layer.borderColor = UIColor.systemYellow.withAlphaComponent(0.8).cgColor
+            button.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.05)
+        }
+        
+        // Directory icon
+        let iconLabel = TerminalLabel()
+        iconLabel.style = .body
+        iconLabel.text = metadata.specialIcon ?? "📁"
+        iconLabel.font = TerminalTheme.Fonts.monospaced(size: 20)
+        iconLabel.isUserInteractionEnabled = false
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(iconLabel)
+        
+        // Directory name (show command line path, not display name)
+        let nameLabel = TerminalLabel()
+        nameLabel.style = .body
+        nameLabel.text = metadata.path.rawValue
+        nameLabel.font = TerminalTheme.Fonts.monospaced(size: 14, weight: .bold)
+        nameLabel.isUserInteractionEnabled = false
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(nameLabel)
+        
+        // Metadata
+        let metadataLabel = TerminalLabel()
+        metadataLabel.style = .caption
+        metadataLabel.text = metadata.accessibilityDescription
+        metadataLabel.isUserInteractionEnabled = false
+        metadataLabel.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(metadataLabel)
+        
+        // Favorite button - make it properly interactive
+        let favoriteButton = UIButton(type: .system)
+        favoriteButton.setTitle(metadata.isFavorite ? "★" : "☆", for: .normal)
+        favoriteButton.setTitleColor(metadata.isFavorite ? .systemYellow : TerminalTheme.Colors.primaryGreen, for: .normal)
+        favoriteButton.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 20, weight: .medium)
+        favoriteButton.backgroundColor = UIColor.clear
+        favoriteButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add target-action instead of UIAction for better compatibility
+        favoriteButton.addTarget(self, action: #selector(favoriteButtonTapped(_:)), for: .touchUpInside)
+        favoriteButton.tag = metadata.path.hashValue // Store path info in tag
+        
+        button.addSubview(favoriteButton)
+        
+        // Navigate button
+        let navigateButton = UIButton(type: .system)
+        navigateButton.setTitle("→", for: .normal)
+        navigateButton.setTitleColor(TerminalTheme.Colors.primaryGreen, for: .normal)
+        navigateButton.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 18, weight: .bold)
+        navigateButton.translatesAutoresizingMaskIntoConstraints = false
+        navigateButton.addTarget(self, action: #selector(navigateButtonTapped(_:)), for: .touchUpInside)
+        navigateButton.tag = metadata.path.hashValue // Store path info in tag
+        button.addSubview(navigateButton)
+        
+        NSLayoutConstraint.activate([
+            iconLabel.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 15),
+            iconLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 12),
+            iconLabel.widthAnchor.constraint(equalToConstant: 24),
+            
+            nameLabel.leadingAnchor.constraint(equalTo: iconLabel.trailingAnchor, constant: 12),
+            nameLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 12),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: favoriteButton.leadingAnchor, constant: -20),
+            
+            metadataLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            metadataLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
+            metadataLabel.trailingAnchor.constraint(lessThanOrEqualTo: favoriteButton.leadingAnchor, constant: -20),
+            metadataLabel.bottomAnchor.constraint(lessThanOrEqualTo: button.bottomAnchor, constant: -12),
+            
+            favoriteButton.trailingAnchor.constraint(equalTo: navigateButton.leadingAnchor, constant: -15),
+            favoriteButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            favoriteButton.widthAnchor.constraint(equalToConstant: 40),
+            favoriteButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            navigateButton.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -15),
+            navigateButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            navigateButton.widthAnchor.constraint(equalToConstant: 30),
+            navigateButton.heightAnchor.constraint(equalToConstant: 30)
+        ])
+        
+        return button
+    }
+    
+
     
     private func showTrainingDirectory() {
         directoryContentsLabel.text = "Loading training programs..."
@@ -816,9 +1249,13 @@ class DashboardViewController: UIViewController {
                 }
             }
             
-            currentDirectory = newDirectory
-            updateCurrentDirectory()
-            appendToHistory("Changed to \(newDirectory.displayName)")
+            if isCommandFloating {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.dismissFloatingCommand()
+                }
+            }
+            
+            navigateToDirectory(newDirectory)
             
         case .help:
             showHelpDialog()
@@ -829,11 +1266,15 @@ class DashboardViewController: UIViewController {
         case .back:
             navigateBack()
             
+            if isCommandFloating {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.dismissFloatingCommand()
+                }
+            }
+            
         case .unknown(let input):
             appendToHistory("Unknown command: '\(input)'. Type 'help' for available commands.")
         }
-        
-        commandTextField.text = ""
     }
     
     private func navigateBack() {
@@ -841,9 +1282,7 @@ class DashboardViewController: UIViewController {
         case .root:
             appendToHistory("Already at root directory")
         default:
-            currentDirectory = .root
-            updateCurrentDirectory()
-            appendToHistory("Returned to Home")
+            navigateToDirectory(.root)
         }
     }
     
@@ -912,6 +1351,42 @@ class DashboardViewController: UIViewController {
     }
     
     // MARK: - Actions
+    @objc private func favoriteButtonTapped(_ sender: UIButton) {
+        // Find the metadata by tag (which stores the path hash)
+        let discovered = discoveryManager.getAllDiscovered()
+        guard let metadata = discovered.first(where: { $0.path.hashValue == sender.tag }) else { return }
+        
+        let success = discoveryManager.toggleFavorite(metadata.path)
+        
+        if success {
+            let updatedMetadata = discoveryManager.getMetadata(for: metadata.path)
+            sender.setTitle(updatedMetadata?.isFavorite == true ? "★" : "☆", for: .normal)
+            sender.setTitleColor(updatedMetadata?.isFavorite == true ? .systemYellow : TerminalTheme.Colors.primaryGreen, for: .normal)
+            
+            // Refresh the catalog display to update the favorites count and border styling
+            if currentDirectory == .catalog {
+                updateDirectoryContents()
+            }
+        } else {
+            // Show error - can't add more favorites
+            let alert = UIAlertController(
+                title: "Maximum Favorites Reached",
+                message: "You can only have \(discoveryManager.getMaxFavorites()) favorites. Remove one to add another.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        }
+    }
+    
+    @objc private func navigateButtonTapped(_ sender: UIButton) {
+        // Find the metadata by tag (which stores the path hash)
+        let discovered = discoveryManager.getAllDiscovered()
+        guard let metadata = discovered.first(where: { $0.path.hashValue == sender.tag }) else { return }
+        
+        navigateToDirectory(metadata.path)
+    }
+    
     @objc private func assignmentButtonTapped(_ sender: UIButton) {
         guard let assignmentId = sender.accessibilityIdentifier else { return }
         
@@ -969,7 +1444,16 @@ class DashboardViewController: UIViewController {
 extension DashboardViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         guard let command = textField.text, !command.isEmpty else { return true }
+        
         processCommand(command)
+        
+        // Handle floating command differently
+        if textField.tag == 999 { // Floating text field
+            textField.text = ""
+            // Keep floating interface open for multiple commands
+            return true
+        }
+        
         return true
     }
 }
