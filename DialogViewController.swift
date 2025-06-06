@@ -280,6 +280,12 @@ class DialogDataProvider {
         switch assignmentId {
         case "tutorial_basics":
             return tutorialDialogs
+        case "tutorial_advanced":
+            return advancedTutorialDialogs
+        case "tutorial_correction":
+            return correctionTutorialDialogs
+        case "tutorial_efficiency":
+            return efficiencyTutorialDialogs
         case "random_puzzle":
             return randomPuzzleDialogs
         default:
@@ -294,7 +300,7 @@ class DialogDataProvider {
         ),
         DialogMessage(
             speaker: "Dr. Morgan",
-            text: "Your job is to stabilize energy anomalies using our proprietary tools."
+            text: "Your job is to stabilize energy anomalies using our proprietary harmonization tools."
         ),
         DialogMessage(
             speaker: "Dr. Morgan",
@@ -303,6 +309,63 @@ class DialogDataProvider {
         DialogMessage(
             speaker: "Dr. Morgan",
             text: "The work you are doing is crucial to our facility. It's important to stay focused and take your time."
+        )
+    ]
+    
+    private let advancedTutorialDialogs = [
+        DialogMessage(
+            speaker: "Dr. Morgan",
+            text: "Excellent work on your basic training. Now we'll explore more sophisticated techniques."
+        ),
+        DialogMessage(
+            speaker: "Dr. Morgan",
+            text: "You'll learn how multiple harmonization tools can work together to solve complex field problems."
+        ),
+        DialogMessage(
+            speaker: "Dr. Morgan",
+            text: "Understanding field overlap is critical for efficient energy management."
+        ),
+        DialogMessage(
+            speaker: "Dr. Morgan",
+            text: "Pay attention to how placement affects multiple targets simultaneously."
+        )
+    ]
+    
+    private let correctionTutorialDialogs = [
+        DialogMessage(
+            speaker: "Senior Technician Walsh",
+            text: "Dr. Morgan asked me to teach you about precision protocols."
+        ),
+        DialogMessage(
+            speaker: "Senior Technician Walsh",
+            text: "Sometimes field correction can go too far. We call this 'overshoot.'"
+        ),
+        DialogMessage(
+            speaker: "Senior Technician Walsh",
+            text: "Learning to recognize and correct overshoot is essential for safety."
+        ),
+        DialogMessage(
+            speaker: "Senior Technician Walsh",
+            text: "Remember: precision is more important than speed in our line of work."
+        )
+    ]
+    
+    private let efficiencyTutorialDialogs = [
+        DialogMessage(
+            speaker: "Supervisor Chen",
+            text: "Your progress has been noted. Time for advanced resource management training."
+        ),
+        DialogMessage(
+            speaker: "Supervisor Chen",
+            text: "In the field, you won't always have unlimited harmonization tools."
+        ),
+        DialogMessage(
+            speaker: "Supervisor Chen",
+            text: "Efficiency isn't just about speed - it's about using minimal resources for maximum effect."
+        ),
+        DialogMessage(
+            speaker: "Supervisor Chen",
+            text: "Master this, and you'll be ready for the most challenging assignments."
         )
     ]
     

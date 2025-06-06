@@ -172,4 +172,95 @@ extension PuzzleDefinition {
             negativeMagnets: 1
         )
     }
+    
+    // Tutorial Level 2: Overlapping Fields
+    static func overlappingFieldsPuzzle() -> PuzzleDefinition {
+        let gridSize = 4
+        
+        // Puzzle with two separate overlapping field challenges
+        let targetValues = [
+            [0, -2, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 3],
+            [0, -1, 0, 2]
+        ]
+        
+        // Solution:
+        // Stabilizer at (1,1) affects (0,1) with +2 and (3,1) with +1
+        // Suppressor at (2,3) affects (2,3) with -3 and (3,3) with -2
+        let solution = [
+            [0, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, -1],
+            [0, 0, 0, 0]
+        ]
+        
+        return PuzzleDefinition(
+            gridSize: gridSize,
+            initialCharges: targetValues,
+            solution: solution,
+            placeableGrid: nil,
+            positiveMagnets: 1,
+            negativeMagnets: 1
+        )
+    }
+    
+    // Tutorial Level 3: Correction Protocols (Overshoot Learning)
+    static func correctionProtocolsPuzzle() -> PuzzleDefinition {
+        let gridSize = 3
+        
+        // Plus-sign pattern that encourages overshoot learning
+        let targetValues = [
+            [0, -1, 0],
+            [-1, 0, -1],
+            [0, -1, 0]
+        ]
+        
+        // Solution requires strategic thinking about overshoot
+        let solution = [
+            [0, 0, 0],
+            [0, 1, 0],
+            [0, -1, 0]
+        ]
+        
+        return PuzzleDefinition(
+            gridSize: gridSize,
+            initialCharges: targetValues,
+            solution: solution,
+            placeableGrid: nil,
+            positiveMagnets: 1,
+            negativeMagnets: 1
+        )
+    }
+    
+    // Tutorial Level 4: Resource Management
+    static func resourceManagementPuzzle() -> PuzzleDefinition {
+        let gridSize = 5
+        
+        let targetValues = [
+            [3, 0, 0, 0, -2],
+            [0, 0, -3, 0, 0],
+            [0, 2, 0, -1, 0],
+            [0, 0, 4, 0, 0],
+            [-2, 0, 0, 0, 1]
+        ]
+        
+        // Efficient solution using minimal tools
+        let solution = [
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0],
+            [0, 0, -1, 0, 0],
+            [0, 0, 0, 0, 0]
+        ]
+        
+        return PuzzleDefinition(
+            gridSize: gridSize,
+            initialCharges: targetValues,
+            solution: solution,
+            placeableGrid: nil,
+            positiveMagnets: 2,
+            negativeMagnets: 2
+        )
+    }
 }

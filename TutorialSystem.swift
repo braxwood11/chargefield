@@ -147,6 +147,190 @@ struct BasicTutorial: TutorialLevel {
     let completionMessage = "Great job! You've completed your training."
 }
 
+// MARK: - Advanced Tutorial: Overlapping Fields
+struct AdvancedTutorial: TutorialLevel {
+    let levelId = "tutorial_advanced"
+    let title = "NeutraTech Orientation #2"
+    let description = "Advanced field harmonization techniques"
+    
+    var puzzleDefinition: PuzzleDefinition {
+        return PuzzleDefinition.overlappingFieldsPuzzle()
+    }
+    
+    let steps: [TutorialStep] = [
+        TutorialStep(
+            id: "welcome_back",
+            instruction: "Great work on your first assignment! Now let's learn about overlapping field interactions.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "explain_challenge",
+            instruction: "Notice the targets in different areas. We'll solve them in two steps using overlapping field effects.",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 0, col: 1), .cell(row: 3, col: 1), .cell(row: 2, col: 3), .cell(row: 3, col: 3)]
+        ),
+        TutorialStep(
+            id: "first_placement",
+            instruction: "First, place a stabilizer at position (1,1) to affect the negative targets on the left.",
+            requiresAction: true,
+            highlightTargets: [.cell(row: 1, col: 1)],
+            validation: .magnetPlaced(row: 1, col: 1, type: 1)
+        ),
+        TutorialStep(
+            id: "observe_first_effect",
+            instruction: "Excellent! One stabilizer neutralized two targets through overlapping field effects.",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 0, col: 1), .cell(row: 3, col: 1)]
+        ),
+        TutorialStep(
+            id: "select_suppressor",
+            instruction: "Now select the Suppressor (-) tool to handle the positive targets.",
+            requiresAction: true,
+            highlightTargets: [.suppressorButton],
+            validation: .magnetSelected(type: -1)
+        ),
+        TutorialStep(
+            id: "second_challenge",
+            instruction: "Perfect! Now place the suppressor to neutralize the positive targets on the right.",
+            requiresAction: true,
+            highlightTargets: [.cell(row: 2, col: 3)],
+            validation: .magnetPlaced(row: 2, col: 3, type: -1)
+        ),
+        TutorialStep(
+            id: "complete_advanced",
+            instruction: "Perfect! You've mastered overlapping field effects. Two harmonization tools solved four problems!",
+            requiresAction: false
+        )
+    ]
+    
+    let nextTutorialId: String? = "tutorial_correction"
+    let completionMessage = "Excellent! You've mastered overlapping field effects."
+}
+
+// MARK: - Correction Protocols Tutorial
+struct CorrectionTutorial: TutorialLevel {
+    let levelId = "tutorial_correction"
+    let title = "NeutraTech Orientation #3"
+    let description = "Learn precision correction protocols"
+    
+    var puzzleDefinition: PuzzleDefinition {
+        return PuzzleDefinition.correctionProtocolsPuzzle()
+    }
+    
+    let steps: [TutorialStep] = [
+        TutorialStep(
+            id: "new_challenge",
+            instruction: "This assignment requires precision. Excessive field correction can be as dangerous as insufficient correction.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "show_pattern",
+            instruction: "Notice the plus-sign pattern of negative targets. They're all interconnected.",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 0, col: 1), .cell(row: 1, col: 0), .cell(row: 1, col: 2), .cell(row: 2, col: 1)]
+        ),
+        TutorialStep(
+            id: "demonstrate_overshoot",
+            instruction: "Place a stabilizer at the center (1,1). Watch what happens to the field values.",
+            requiresAction: true,
+            highlightTargets: [.cell(row: 1, col: 1)],
+            validation: .magnetPlaced(row: 1, col: 1, type: 1)
+        ),
+        TutorialStep(
+            id: "explain_overshoot_indicators",
+            instruction: "See the orange stripes? That means you've overcorrected - the value went past zero.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "teach_recognition",
+            instruction: "Overshoot cells show warning patterns. The arrow indicates which harmonization tool type you need.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "demonstrate_recovery",
+            instruction: "Use a suppressor to pull the overshoot values back toward zero.",
+            requiresAction: true,
+            highlightTargets: [.suppressorButton],
+            validation: .magnetSelected(type: -1)
+        ),
+        TutorialStep(
+            id: "strategic_thinking",
+            instruction: "Sometimes temporary overcorrection is necessary to reach the optimal solution.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "perfect_balance",
+            instruction: "Complete the assignment by achieving exact neutralization in all target cells.",
+            requiresAction: true,
+            validation: .puzzleSolved
+        )
+    ]
+    
+    let nextTutorialId: String? = "tutorial_efficiency"
+    let completionMessage = "Outstanding! You've mastered precision correction protocols."
+}
+
+// MARK: - Resource Management Tutorial
+struct EfficiencyTutorial: TutorialLevel {
+    let levelId = "tutorial_efficiency"
+    let title = "NeutraTech Orientation #4"
+    let description = "Master efficient resource utilization"
+    
+    var puzzleDefinition: PuzzleDefinition {
+        return PuzzleDefinition.resourceManagementPuzzle()
+    }
+    
+    let steps: [TutorialStep] = [
+        TutorialStep(
+            id: "resource_constraints",
+            instruction: "This assignment has limited harmonization tools. You must use your equipment efficiently.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "analyze_problem",
+            instruction: "Count the targets: some positive, some negative. You have only 4 harmonization tools total.",
+            requiresAction: false,
+            highlightTargets: [.grid]
+        ),
+        TutorialStep(
+            id: "identify_key_positions",
+            instruction: "Look for placement spots where your tools can influence multiple targets simultaneously.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "demonstrate_efficiency",
+            instruction: "Place a suppressor at (2,2) - see how it affects three different target cells?",
+            requiresAction: true,
+            highlightTargets: [.cell(row: 2, col: 2)],
+            validation: .magnetPlaced(row: 2, col: 2, type: -1)
+        ),
+        TutorialStep(
+            id: "calculate_requirements",
+            instruction: "Each target needs specific correction. Plan your harmonization tool deployment before placing.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "show_multi_target",
+            instruction: "One well-placed harmonization tool can solve multiple problems.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "resource_tracking",
+            instruction: "Monitor your remaining tools. Each placement must count.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "master_efficiency",
+            instruction: "Complete the assignment using all available field equipment optimally.",
+            requiresAction: true,
+            validation: .puzzleSolved
+        )
+    ]
+    
+    let nextTutorialId: String? = nil // Last tutorial in the series
+    let completionMessage = "Exceptional work! You've mastered efficient harmonization protocols and are ready for advanced assignments."
+}
+
 // MARK: - Tutorial Campaign Manager
 class TutorialCampaign {
     static let shared = TutorialCampaign()
@@ -158,11 +342,16 @@ class TutorialCampaign {
     }
     
     private func registerDefaultTutorials() {
-        // Register basic tutorial
+        // Register all tutorials in order
         let basicTutorial = BasicTutorial()
-        tutorials[basicTutorial.levelId] = basicTutorial
+        let advancedTutorial = AdvancedTutorial()
+        let correctionTutorial = CorrectionTutorial()
+        let efficiencyTutorial = EfficiencyTutorial()
         
-        // TODO: Add more tutorials here as they're created
+        tutorials[basicTutorial.levelId] = basicTutorial
+        tutorials[advancedTutorial.levelId] = advancedTutorial
+        tutorials[correctionTutorial.levelId] = correctionTutorial
+        tutorials[efficiencyTutorial.levelId] = efficiencyTutorial
     }
     
     func loadTutorial(_ id: String) -> TutorialLevel? {
@@ -285,7 +474,7 @@ class TutorialCoordinator {
         let step = tutorial.steps[currentStepIndex]
         
         // Set interaction mode
-        overlay.allowFullInteraction = (step.id == "complete_task")
+        overlay.allowFullInteraction = (step.id == "complete_task" || step.id == "complete_advanced" || step.id == "perfect_balance" || step.id == "master_efficiency")
         
         // Update instruction text
         overlay.setInstructionText(step.instruction)
@@ -301,8 +490,8 @@ class TutorialCoordinator {
             highlightTargets(targets)
         }
         
-        // Special handling for certain steps
-        if step.id == "complete_task" {
+        // Special handling for completion steps
+        if step.id.contains("complete") || step.id.contains("perfect") || step.id.contains("master") {
             overlay.isHidden = true
             showCompletionBanner()
         } else {

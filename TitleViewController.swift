@@ -52,7 +52,7 @@ class TitleViewController: UIViewController {
     
     private func setupLogo() {
         // Load the logo image
-        logoImageView.image = UIImage(named: "NT-Logo-1")
+        logoImageView.image = UIImage(named: "NT-Logo-2")
         logoImageView.contentMode = .scaleAspectFit
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         

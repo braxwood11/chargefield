@@ -198,7 +198,7 @@ class MessageManager {
                 
                 Your employee ID is NT-7842. Please memorize this number.
                 
-                Equipment allocation has been approved. Report to Supply (Sub-level 2) to receive your standard-issue field kit.
+                Equipment allocation has been approved. Report to Supply (Sub-level 2) to receive your standard-issue harmonization tools.
                 
                 -- IT Support
                 """,
@@ -218,7 +218,7 @@ class MessageManager {
                 
                 I've scheduled your orientation for today. Please be prompt.
                 
-                We'll start with basic field manipulation exercises before moving on to more complex anomaly management.
+                We'll start with basic field harmonization exercises before moving on to more complex anomaly management.
                 
                 Looking forward to working with you.
                 
@@ -232,17 +232,17 @@ class MessageManager {
                 attachment: nil
             ),
             
-            // Tutorial completion message
+            // Basic tutorial completion message
             Message(
                 id: "tutorial_complete_001",
                 sender: "Dr. Morgan",
-                subject: "Training Complete - Well Done!",
+                subject: "Basic Training Complete - Well Done!",
                 body: """
                 Excellent work completing your initial training!
                 
                 You've demonstrated a solid understanding of field harmonization basics. Your performance metrics have been logged and forwarded to management.
                 
-                You're now cleared for Level 1 field operations. New assignments will become available on your dashboard.
+                You're now cleared for Level 1 field operations. Advanced training modules have been unlocked on your dashboard.
                 
                 Remember: efficiency and accuracy are paramount. Each anomaly you neutralize helps maintain facility stability.
                 
@@ -256,7 +256,94 @@ class MessageManager {
                 attachment: MessageAttachment(
                     type: .document,
                     title: "Field Operations Manual v1.2",
-                    content: "Basic procedures for anomaly neutralization..."
+                    content: "Basic procedures for anomaly neutralization using harmonization tools..."
+                )
+            ),
+            
+            // Advanced tutorial completion message
+            Message(
+                id: "tutorial_complete_002",
+                sender: "Dr. Morgan",
+                subject: "Advanced Training - Impressive Progress",
+                body: """
+                Outstanding work on your advanced field harmonization training!
+                
+                Your understanding of overlapping field effects is exceptional. The ability to strategically place harmonization tools for maximum efficiency is a crucial skill.
+                
+                Level 2 clearance protocols are now available. You'll notice more complex assignments becoming available on your dashboard.
+                
+                Your supervisor has expressed interest in your rapid progress. Keep this up and you'll be eligible for specialized assignments soon.
+                
+                Best regards,
+                Dr. Morgan
+                """,
+                timestamp: Date(),
+                isRead: false,
+                priority: .high,
+                triggerCondition: .onTutorialComplete(tutorialId: "tutorial_advanced"),
+                attachment: MessageAttachment(
+                    type: .document,
+                    title: "Advanced Field Theory Documentation",
+                    content: "Detailed analysis of harmonic field interactions and optimization strategies..."
+                )
+            ),
+            
+            // Correction protocols completion message
+            Message(
+                id: "tutorial_complete_003",
+                sender: "Senior Technician Walsh",
+                subject: "Precision Protocols - Certification Achieved",
+                body: """
+                Field Specialist,
+                
+                Dr. Morgan asked me to congratulate you on mastering our correction protocols. Understanding overshoot mechanics isn't just academic - it's a safety requirement.
+                
+                Your precision in field manipulation meets our highest standards. I've updated your certification to include Hazardous Field Operations.
+                
+                What you've learned today could save lives in the field. Never underestimate the importance of precision over speed.
+                
+                You're ready for resource-constrained operations.
+                
+                Regards,
+                Senior Technician Walsh
+                """,
+                timestamp: Date(),
+                isRead: false,
+                priority: .high,
+                triggerCondition: .onTutorialComplete(tutorialId: "tutorial_correction"),
+                attachment: MessageAttachment(
+                    type: .schematic,
+                    title: "Emergency Correction Procedures",
+                    content: "Step-by-step protocols for field overshoot correction and safety procedures..."
+                )
+            ),
+            
+            // Efficiency tutorial completion message
+            Message(
+                id: "tutorial_complete_004",
+                sender: "Supervisor Chen",
+                subject: "Training Complete - Advanced Certification",
+                body: """
+                Field Specialist,
+                
+                Congratulations on completing your full training curriculum. Your mastery of efficient resource utilization is exactly what we need in the field.
+                
+                Your personnel file has been updated with advanced field harmonization certification. You're now eligible for high-priority assignments and specialized operations.
+                
+                Management has taken notice of your exceptional performance. Opportunities for advancement will be presented to qualified personnel like yourself.
+                
+                Report to Assignment Control for your next briefing.
+                
+                - Supervisor Chen
+                """,
+                timestamp: Date(),
+                isRead: false,
+                priority: .urgent,
+                triggerCondition: .onTutorialComplete(tutorialId: "tutorial_efficiency"),
+                attachment: MessageAttachment(
+                    type: .document,
+                    title: "Advanced Operations Clearance",
+                    content: "Your security clearance has been upgraded. New assignment categories are now available..."
                 )
             ),
             

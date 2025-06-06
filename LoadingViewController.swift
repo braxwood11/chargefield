@@ -122,7 +122,7 @@ class LoadingViewController: UIViewController {
     
     private func setupCompanyLogo() {
         // Load the logo image
-        companyLogo.image = UIImage(named: "NT-Logo-1")
+        companyLogo.image = UIImage(named: "NT-Logo-2")
         companyLogo.contentMode = .scaleAspectFit
         companyLogo.translatesAutoresizingMaskIntoConstraints = false
         companyLogo.alpha = 0
