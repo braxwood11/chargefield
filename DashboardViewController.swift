@@ -119,6 +119,7 @@ class DashboardViewController: UIViewController {
     private var terminalHistory: [String] = []
     private var floatingCommandView: UIView?
     private var isCommandFloating = false
+    private var directoryContentsBottomConstraint: NSLayoutConstraint?
     
     // MARK: - UI Elements
     private let titleView = UIView()
@@ -268,6 +269,7 @@ class DashboardViewController: UIViewController {
         directoryContentsLabel.style = .body
         directoryContentsLabel.numberOfLines = 0
         directoryContentsLabel.translatesAutoresizingMaskIntoConstraints = false
+        directoryContentsBottomConstraint = directoryContentsLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
         contentView.addSubview(directoryContentsLabel)
         
         NSLayoutConstraint.activate([
@@ -295,9 +297,9 @@ class DashboardViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
             directoryContentsLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            directoryContentsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 15),
-            directoryContentsLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -15),
-            directoryContentsLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+                directoryContentsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 15),
+                directoryContentsLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -15),
+                directoryContentsBottomConstraint!
         ])
     }
     
@@ -621,40 +623,61 @@ class DashboardViewController: UIViewController {
         isCommandFloating = true
     }
     
+    // Terminal-style menu approach (most compact and clean)
     private func createFavoritesStack(favorites: [DirectoryMetadata]) -> UIStackView {
         let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.distribution = .fillEqually
-        stackView.spacing = 8
+        stackView.axis = .vertical
+        stackView.distribution = .fill
+        stackView.spacing = 2
         stackView.translatesAutoresizingMaskIntoConstraints = false
         
-        for favorite in favorites.prefix(5) {
-            let button = createFavoriteChip(for: favorite)
+        for (index, favorite) in favorites.enumerated() {
+            let button = createMenuStyleFavoriteButton(for: favorite, number: index + 1)
             stackView.addArrangedSubview(button)
         }
         
         return stackView
     }
-    
-    private func createFavoriteChip(for metadata: DirectoryMetadata) -> UIButton {
+
+    private func createMenuStyleFavoriteButton(for metadata: DirectoryMetadata, number: Int) -> UIButton {
         let button = UIButton(type: .system)
         
-        let displayText = metadata.specialIcon.map { "\($0) " } ?? ""
-        button.setTitle("\(displayText)\(metadata.path.displayName)", for: .normal)
-        button.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 12, weight: .medium)
-        button.setTitleColor(TerminalTheme.Colors.primaryGreen, for: .normal)
-        button.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.1)
-        button.layer.cornerRadius = 16
-        button.layer.borderWidth = 1
-        button.layer.borderColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.3).cgColor
-        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        // Terminal menu style: "1. 📁 ~/training"
+        let shortPath = metadata.path.rawValue
+        let displayText = "\(number). \(metadata.specialIcon ?? "📁") \(shortPath)"
         
+        button.setTitle(displayText, for: .normal)
+        button.titleLabel?.font = TerminalTheme.Fonts.monospaced(size: 14, weight: .medium)
+        button.setTitleColor(TerminalTheme.Colors.primaryGreen, for: .normal)
+        button.backgroundColor = .clear
+        button.contentHorizontalAlignment = .left
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+        
+        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        
+        // Add subtle hover effect
         button.addAction(UIAction { [weak self] _ in
             self?.navigateToDirectory(metadata.path)
             self?.dismissFloatingCommand()
         }, for: .touchUpInside)
         
+        // Add touch animations
+        button.addTarget(self, action: #selector(menuFavoriteTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(menuFavoriteTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        
         return button
+    }
+
+    @objc private func menuFavoriteTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            sender.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.1)
+        }
+    }
+
+    @objc private func menuFavoriteTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            sender.backgroundColor = .clear
+        }
     }
     
     @objc private func dismissFloatingCommand() {
@@ -768,33 +791,47 @@ class DashboardViewController: UIViewController {
     
     private func displayCatalogButtons(_ directories: [DirectoryMetadata]) {
         var previousButton: UIView?
-        let buttonHeight: CGFloat = 85 // Increased height for better layout
+        let buttonHeight: CGFloat = 100  // Increased from 85 to accommodate metadata line
         let buttonSpacing: CGFloat = 12
+        
+        // Deactivate the directoryContentsLabel bottom constraint
+        directoryContentsBottomConstraint?.isActive = false
         
         for directory in directories {
             let button = createCatalogButton(for: directory)
+            button.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview(button)
-            assignmentButtons.append(button) // Reuse this array for cleanup
+            assignmentButtons.append(button)
             
-            // Set constraints
             if let previous = previousButton {
-                button.topAnchor.constraint(equalTo: previous.bottomAnchor, constant: buttonSpacing).isActive = true
+                NSLayoutConstraint.activate([
+                    button.topAnchor.constraint(equalTo: previous.bottomAnchor, constant: buttonSpacing),
+                    button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+                    button.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+                    button.heightAnchor.constraint(equalToConstant: buttonHeight)
+                ])
             } else {
-                button.topAnchor.constraint(equalTo: directoryContentsLabel.bottomAnchor, constant: 20).isActive = true
+                NSLayoutConstraint.activate([
+                    button.topAnchor.constraint(equalTo: directoryContentsLabel.bottomAnchor, constant: 20),
+                    button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+                    button.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+                    button.heightAnchor.constraint(equalToConstant: buttonHeight)
+                ])
             }
-            
-            NSLayoutConstraint.activate([
-                button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-                button.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-                button.heightAnchor.constraint(equalToConstant: buttonHeight)
-            ])
             
             previousButton = button
         }
         
-        // Update content size
+        // Set the last button's bottom constraint to control content height
         if let lastButton = assignmentButtons.last {
-            lastButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20).isActive = true
+            NSLayoutConstraint.activate([
+                lastButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+            ])
+        }
+        
+        // Force layout update to ensure scroll view content size is recalculated
+        DispatchQueue.main.async {
+            self.view.layoutIfNeeded()
         }
     }
     
@@ -826,11 +863,12 @@ class DashboardViewController: UIViewController {
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(nameLabel)
         
-        // Metadata
+        // Metadata - moved to its own line with better spacing
         let metadataLabel = TerminalLabel()
         metadataLabel.style = .caption
         metadataLabel.text = metadata.accessibilityDescription
         metadataLabel.isUserInteractionEnabled = false
+        metadataLabel.numberOfLines = 0  // Allow multiple lines if needed
         metadataLabel.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(metadataLabel)
         
@@ -859,34 +897,37 @@ class DashboardViewController: UIViewController {
         button.addSubview(navigateButton)
         
         NSLayoutConstraint.activate([
+            // Icon positioning
             iconLabel.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 15),
-            iconLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 12),
+            iconLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 15),
             iconLabel.widthAnchor.constraint(equalToConstant: 24),
             
+            // Directory name - top line next to icon
             nameLabel.leadingAnchor.constraint(equalTo: iconLabel.trailingAnchor, constant: 12),
-            nameLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 12),
+            nameLabel.topAnchor.constraint(equalTo: button.topAnchor, constant: 15),
             nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: favoriteButton.leadingAnchor, constant: -20),
             
+            // Metadata - full width on its own line below the name
             metadataLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            metadataLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 6),
+            metadataLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
             metadataLabel.trailingAnchor.constraint(lessThanOrEqualTo: favoriteButton.leadingAnchor, constant: -20),
-            metadataLabel.bottomAnchor.constraint(lessThanOrEqualTo: button.bottomAnchor, constant: -12),
+            metadataLabel.bottomAnchor.constraint(lessThanOrEqualTo: button.bottomAnchor, constant: -15),
             
+            // Favorite button - positioned in top right
             favoriteButton.trailingAnchor.constraint(equalTo: navigateButton.leadingAnchor, constant: -15),
-            favoriteButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            favoriteButton.topAnchor.constraint(equalTo: button.topAnchor, constant: 10),
             favoriteButton.widthAnchor.constraint(equalToConstant: 40),
             favoriteButton.heightAnchor.constraint(equalToConstant: 40),
             
+            // Navigate button - top right corner
             navigateButton.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -15),
-            navigateButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            navigateButton.topAnchor.constraint(equalTo: button.topAnchor, constant: 10),
             navigateButton.widthAnchor.constraint(equalToConstant: 30),
             navigateButton.heightAnchor.constraint(equalToConstant: 30)
         ])
         
         return button
     }
-    
-
     
     private func showTrainingDirectory() {
         directoryContentsLabel.text = "Loading training programs..."
@@ -1112,8 +1153,16 @@ class DashboardViewController: UIViewController {
     }
     
     private func clearAssignmentButtons() {
+        // Remove all button views
         assignmentButtons.forEach { $0.removeFromSuperview() }
         assignmentButtons.removeAll()
+        
+        // Restore the directoryContentsLabel bottom constraint
+            directoryContentsBottomConstraint?.isActive = true
+        
+        DispatchQueue.main.async {
+            self.view.layoutIfNeeded()
+        }
     }
     
     // MARK: - UI Components (reuse existing methods)

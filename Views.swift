@@ -541,6 +541,322 @@ class CellView: UIView {
         layer.sublayers?.filter { $0.name == "influenceLayer" }.forEach { $0.removeFromSuperlayer() }
         previewValue = nil
     }
+    
+    // MARK: - Animation Methods
+    
+    /// Animate magnet placement with magnetic snap effect
+    func animateMagnetPlacement(magnetType: Int, completion: (() -> Void)? = nil) {
+        guard let cell = cell else { return }
+        
+        // Store original state
+        let originalTransform = magnetView.transform
+        let originalAlpha = magnetView.alpha
+        
+        // Start with magnet invisible and scaled down
+        magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        magnetView.alpha = 0
+        magnetView.isHidden = false
+        
+        // Update magnet appearance
+        updateMagnetAppearance(magnetType: magnetType)
+        
+        // Create placement effect with haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // Magnetic snap animation with bounce
+        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .curveEaseOut) {
+            self.magnetView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            self.magnetView.alpha = 1.0
+        } completion: { _ in
+            UIView.animate(withDuration: 0.1) {
+                self.magnetView.transform = originalTransform
+            } completion: { _ in
+                completion?()
+            }
+        }
+        
+        // Add glow effect
+        addPlacementGlow(magnetType: magnetType)
+    }
+    
+    /// Animate magnet removal with dissolution effect
+    func animateMagnetRemoval(completion: (() -> Void)? = nil) {
+        guard !magnetView.isHidden else {
+            completion?()
+            return
+        }
+        
+        // Light haptic feedback for removal
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        // Create particle dissolution effect
+        createRemovalParticles()
+        
+        // Scale down and fade out
+        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn) {
+            self.magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+            self.magnetView.alpha = 0
+        } completion: { _ in
+            self.magnetView.isHidden = true
+            self.magnetView.transform = .identity
+            self.magnetView.alpha = 1.0
+            completion?()
+        }
+    }
+    
+    /// Animate field influence effect on affected cells
+    func animateFieldInfluence(intensity: Int, magnetType: Int) {
+        // Create ripple effect
+        let rippleView = UIView()
+        rippleView.backgroundColor = magnetType == 1 ?
+            UIColor.red.withAlphaComponent(0.3) :
+            UIColor.blue.withAlphaComponent(0.3)
+        rippleView.layer.cornerRadius = 4
+        rippleView.frame = bounds.insetBy(dx: 4, dy: 4)
+        rippleView.alpha = 0
+        addSubview(rippleView)
+        
+        // Brief highlight animation
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+            rippleView.alpha = 0.6
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
+                rippleView.alpha = 0
+                rippleView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            } completion: { _ in
+                rippleView.removeFromSuperview()
+            }
+        }
+    }
+    
+    /// Animate successful neutralization with green success effect
+    func animateNeutralizationSuccess() {
+        // Create success flash
+        let successFlash = UIView()
+        successFlash.backgroundColor = UIColor.green.withAlphaComponent(0.6)
+        successFlash.layer.cornerRadius = 4
+        successFlash.frame = bounds
+        successFlash.alpha = 0
+        addSubview(successFlash)
+        
+        // Success particle burst
+        createSuccessParticles()
+        
+        // Flash animation
+        UIView.animate(withDuration: 0.15, delay: 0, options: .curveEaseOut) {
+            successFlash.alpha = 1.0
+        } completion: { _ in
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn) {
+                successFlash.alpha = 0
+            } completion: { _ in
+                successFlash.removeFromSuperview()
+            }
+        }
+        
+        // Scale pulse for emphasis
+        let originalTransform = transform
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+            self.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.transform = originalTransform
+            }
+        }
+        
+        // Medium haptic feedback for success
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+    }
+    
+    /// Animate overshoot warning with orange shake effect
+    func animateOvershootWarning() {
+        // Create warning flash
+        let warningFlash = UIView()
+        warningFlash.backgroundColor = UIColor.orange.withAlphaComponent(0.5)
+        warningFlash.layer.cornerRadius = 4
+        warningFlash.frame = bounds
+        warningFlash.alpha = 0
+        addSubview(warningFlash)
+        
+        // Warning shake animation
+        let shakeAnimation = CABasicAnimation(keyPath: "transform.translation.x")
+        shakeAnimation.fromValue = -3
+        shakeAnimation.toValue = 3
+        shakeAnimation.duration = 0.1
+        shakeAnimation.autoreverses = true
+        shakeAnimation.repeatCount = 3
+        
+        layer.add(shakeAnimation, forKey: "overshootShake")
+        
+        // Flash animation
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+            warningFlash.alpha = 1.0
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
+                warningFlash.alpha = 0
+            } completion: { _ in
+                warningFlash.removeFromSuperview()
+            }
+        }
+        
+        // Light haptic feedback for warning
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+    
+    /// Animate incremental value change with subtle number effect
+    func animateValueChange(from oldValue: Int, to newValue: Int) {
+        // Animate the charge label with a subtle scale effect
+        let originalTransform = chargeLabel.transform
+        
+        // Brief scale up then back down
+        UIView.animate(withDuration: 0.15, delay: 0, options: .curveEaseOut) {
+            self.chargeLabel.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.15, delay: 0, options: .curveEaseIn) {
+                self.chargeLabel.transform = originalTransform
+            }
+        }
+        
+        // Color flash based on change direction
+        let originalColor = chargeLabel.textColor
+        let flashColor = newValue > oldValue ?
+            UIColor.red.withAlphaComponent(0.8) :
+            UIColor.blue.withAlphaComponent(0.8)
+        
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+            self.chargeLabel.textColor = flashColor
+        } completion: { _ in
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseIn) {
+                self.chargeLabel.textColor = originalColor
+            }
+        }
+        
+        // Create subtle number change particles
+        if abs(newValue - oldValue) > 1 {
+            createValueChangeParticles(changeAmount: newValue - oldValue)
+        }
+    }
+    
+    // MARK: - Private Animation Helpers
+    
+    private func updateMagnetAppearance(magnetType: Int) {
+        if magnetType > 0 {
+            magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0)
+            magnetSymbol.text = "+"
+        } else {
+            magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
+            magnetSymbol.text = "-"
+        }
+    }
+    
+    private func addPlacementGlow(magnetType: Int) {
+        // Create temporary glow effect
+        let glowView = UIView()
+        glowView.backgroundColor = magnetType == 1 ?
+            UIColor.red.withAlphaComponent(0.1) :
+            UIColor.blue.withAlphaComponent(0.1)
+        glowView.layer.cornerRadius = bounds.width / 2
+        glowView.frame = bounds.insetBy(dx: -5, dy: -5)
+        glowView.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        insertSubview(glowView, at: 0)
+        
+        // Glow animation
+        UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseOut) {
+            glowView.alpha = 0
+            glowView.transform = CGAffineTransform(scaleX: 2.0, y: 2.0)
+        } completion: { _ in
+            glowView.removeFromSuperview()
+        }
+    }
+    
+    private func createRemovalParticles() {
+        let particleCount = 6
+        let magnetCenter = CGPoint(x: magnetView.center.x, y: magnetView.center.y)
+        
+        for i in 0..<particleCount {
+            let particle = UIView()
+            particle.backgroundColor = magnetView.backgroundColor
+            particle.frame = CGRect(x: 0, y: 0, width: 3, height: 3)
+            particle.layer.cornerRadius = 1.5
+            particle.center = magnetCenter
+            addSubview(particle)
+            
+            // Random direction and distance
+            let angle = Double(i) * (2 * Double.pi / Double(particleCount))
+            let distance: CGFloat = 20
+            let endX = magnetCenter.x + cos(angle) * distance
+            let endY = magnetCenter.y + sin(angle) * distance
+            
+            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+                particle.center = CGPoint(x: endX, y: endY)
+                particle.alpha = 0
+                particle.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+            } completion: { _ in
+                particle.removeFromSuperview()
+            }
+        }
+    }
+    
+    private func createSuccessParticles() {
+        let particleCount = 8
+        let centerPoint = CGPoint(x: bounds.midX, y: bounds.midY)
+        
+        for i in 0..<particleCount {
+            let particle = UIView()
+            particle.backgroundColor = UIColor.green
+            particle.frame = CGRect(x: 0, y: 0, width: 2, height: 2)
+            particle.layer.cornerRadius = 1
+            particle.center = centerPoint
+            particle.alpha = 0.8
+            addSubview(particle)
+            
+            // Random direction and distance
+            let angle = Double(i) * (2 * Double.pi / Double(particleCount)) + Double.random(in: -0.2...0.2)
+            let distance: CGFloat = CGFloat.random(in: 15...25)
+            let endX = centerPoint.x + CGFloat(cos(angle)) * distance
+            let endY = centerPoint.y + CGFloat(sin(angle)) * distance
+            
+            UIView.animate(withDuration: 0.4, delay: Double.random(in: 0...0.1), options: .curveEaseOut) {
+                particle.center = CGPoint(x: endX, y: endY)
+                particle.alpha = 0
+                particle.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+            } completion: { _ in
+                particle.removeFromSuperview()
+            }
+        }
+    }
+
+    private func createValueChangeParticles(changeAmount: Int) {
+        let particleCount = min(abs(changeAmount), 4) // Limit particles based on change amount
+        let centerPoint = CGPoint(x: chargeLabel.center.x, y: chargeLabel.center.y)
+        let particleColor = changeAmount > 0 ? UIColor.red : UIColor.blue
+        
+        for i in 0..<particleCount {
+            let particle = UIView()
+            particle.backgroundColor = particleColor.withAlphaComponent(0.6)
+            particle.frame = CGRect(x: 0, y: 0, width: 1.5, height: 1.5)
+            particle.layer.cornerRadius = 0.75
+            particle.center = centerPoint
+            particle.alpha = 0.7
+            addSubview(particle)
+            
+            // Small random movement
+            let angle = Double.random(in: 0...(2 * Double.pi))
+            let distance: CGFloat = CGFloat.random(in: 8...15)
+            let endX = centerPoint.x + CGFloat(cos(angle)) * distance
+            let endY = centerPoint.y + CGFloat(sin(angle)) * distance
+            
+            UIView.animate(withDuration: 0.3, delay: Double.random(in: 0...0.05), options: .curveEaseOut) {
+                particle.center = CGPoint(x: endX, y: endY)
+                particle.alpha = 0
+            } completion: { _ in
+                particle.removeFromSuperview()
+            }
+        }
+    }
 }
 
 // A simple message view for showing completion or information

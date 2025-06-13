@@ -16,6 +16,9 @@ class GameViewController: UIViewController {
     private var animationController: GameAnimationController?
     private var gameSession: GameSession?
     
+    // Animation state tracking
+    private var cellsBeingAnimated: Set<GridPosition> = []
+    
     // MARK: - UI Properties
     private var cellViews: [[CellView]] = []
     private(set) var gridView: UIView?
@@ -62,6 +65,26 @@ class GameViewController: UIViewController {
         if let viewModel = viewModel {
             configureWithViewModel(viewModel)
         }
+    }
+    
+    /// Mark affected cells as being animated to prevent premature visual updates
+    private func markAffectedCellsAsAnimating(sourceRow: Int, sourceCol: Int) {
+        guard let viewModel = viewModel else { return }
+        
+        let influenceArea = viewModel.getInfluenceArea(for: sourceRow, col: sourceCol)
+        
+        for row in 0..<influenceArea.count {
+            for col in 0..<influenceArea[row].count {
+                if influenceArea[row][col] && row < cellViews.count && col < cellViews[row].count {
+                    cellsBeingAnimated.insert(GridPosition(row: row, col: col))
+                }
+            }
+        }
+    }
+    
+    /// Clear all animation tracking
+    private func clearAnimationTracking() {
+        cellsBeingAnimated.removeAll()
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -361,6 +384,11 @@ class GameViewController: UIViewController {
         
         for row in 0..<cellViews.count {
             for col in 0..<cellViews[row].count {
+                let position = GridPosition(row: row, col: col)
+                
+                // Skip cells that are currently being animated - they'll update when animation completes
+                guard !cellsBeingAnimated.contains(position) else { continue }
+                
                 if let cell = viewModel.getCellAt(row: row, col: col) {
                     updateCellView(cellViews[row][col], with: cell)
                 }
@@ -412,17 +440,55 @@ class GameViewController: UIViewController {
             coordinator.handleGameStateChange()
         }
         
+        // Store previous state for animation
+        let previousToolEffect = viewModel.getCellAt(row: row, col: col)?.toolEffect ?? 0
+        
         // Handle direct magnet removal
         if let cell = viewModel.getCellAt(row: row, col: col), cell.toolEffect != 0 {
+            // Store the current field state before removal
+            let preRemovalFieldStates = captureCurrentFieldStates()
+            
+            // Mark cells that will be affected by removal as being animated
+            markAffectedCellsAsAnimating(sourceRow: row, sourceCol: col)
+            
             viewModel.removeMagnetDirectly(at: row, col: col)
             clearAllInfluencePreviews()
+            
+            // Animate removal with field update
+            animationController?.animateMagnetRemoval(at: GridPosition(row: row, col: col),
+                                                    cellView: cellView,
+                                                    removedType: previousToolEffect) {
+                // Update affected cells after removal animation
+                self.updateFieldVisuals(previousStates: preRemovalFieldStates)
+                // Clear animation tracking
+                self.clearAnimationTracking()
+            }
             return
         }
         
         // Handle selection and placement
         if let cell = viewModel.getCellAt(row: row, col: col), cell.isSelected {
+            // Store current field states before placement
+            let prePlacementFieldStates = captureCurrentFieldStates()
+            
             viewModel.placeOrRemoveMagnet(at: row, col: col)
             clearAllInfluencePreviews()
+            
+            // Check if a magnet was actually placed
+            let newToolEffect = viewModel.getCellAt(row: row, col: col)?.toolEffect ?? 0
+            if newToolEffect != 0 && newToolEffect != previousToolEffect {
+                // Animate placement but don't update field visuals yet
+                animationController?.animateMagnetPlacement(at: GridPosition(row: row, col: col),
+                                                          cellView: cellView,
+                                                          magnetType: newToolEffect,
+                                                          sourceButton: newToolEffect == 1 ? positiveButton : negativeButton)
+                
+                // Show field influence animation with delayed visual updates
+                showFieldInfluenceAnimationWithDelayedUpdates(sourceRow: row, sourceCol: col,
+                                                            magnetType: newToolEffect,
+                                                            previousStates: prePlacementFieldStates)
+            }
+            
             gameSession?.moveCount += 1
             GameProgressManager.shared.recordMagnetPlaced()
         } else {
@@ -438,10 +504,13 @@ class GameViewController: UIViewController {
     }
     
     @objc private func resetButtonTapped() {
-        viewModel?.resetPuzzle()
-        gameSession?.undoCount += 1
-        GameProgressManager.shared.recordMoveUndone()
-        updateUI()
+        // Animate all existing magnets being removed before reset
+        animateResetSequence {
+            self.viewModel?.resetPuzzle()
+            self.gameSession?.undoCount += 1
+            GameProgressManager.shared.recordMoveUndone()
+            self.updateUI()
+        }
     }
     
     @objc private func solutionButtonTapped() {
@@ -470,6 +539,262 @@ class GameViewController: UIViewController {
         UIView.animate(withDuration: 0.1) {
             sender.transform = .identity
             sender.alpha = 1.0
+        }
+    }
+    
+    // MARK: - Animation Helper Methods
+    
+    /// Capture current field states before making changes
+    private func captureCurrentFieldStates() -> [GridPosition: (currentValue: Int, isNeutralized: Bool, isOvershot: Bool)] {
+        guard let viewModel = viewModel else { return [:] }
+        
+        var states: [GridPosition: (currentValue: Int, isNeutralized: Bool, isOvershot: Bool)] = [:]
+        
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                if let cell = viewModel.getCellAt(row: row, col: col) {
+                    let position = GridPosition(row: row, col: col)
+                    states[position] = (
+                        currentValue: cell.currentFieldValue,
+                        isNeutralized: cell.isNeutralized,
+                        isOvershot: cell.isOvershot
+                    )
+                }
+            }
+        }
+        
+        return states
+    }
+    
+    /// Update field visuals with special effects for different conditions
+    private func updateFieldVisuals(previousStates: [GridPosition: (currentValue: Int, isNeutralized: Bool, isOvershot: Bool)]) {
+        guard let viewModel = viewModel else { return }
+        
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                let position = GridPosition(row: row, col: col)
+                let cellView = cellViews[row][col]
+                
+                guard let cell = viewModel.getCellAt(row: row, col: col),
+                      let previousState = previousStates[position] else { continue }
+                
+                // Update the cell data first
+                updateCellView(cellView, with: cell)
+                
+                // Check for special conditions and animate accordingly
+                if cell.isNeutralized && !previousState.isNeutralized {
+                    // Newly neutralized - green success effect
+                    cellView.animateNeutralizationSuccess()
+                } else if cell.isOvershot && !previousState.isOvershot {
+                    // Newly overshot - orange warning effect
+                    cellView.animateOvershootWarning()
+                } else if cell.currentFieldValue != previousState.currentValue {
+                    // Value changed - subtle number change effect
+                    cellView.animateValueChange(from: previousState.currentValue, to: cell.currentFieldValue)
+                }
+            }
+        }
+    }
+    
+    private func showFieldInfluenceAnimationWithDelayedUpdates(sourceRow: Int, sourceCol: Int, magnetType: Int, previousStates: [GridPosition: (currentValue: Int, isNeutralized: Bool, isOvershot: Bool)]) {
+        guard let viewModel = viewModel else { return }
+        
+        let influenceArea = viewModel.getInfluenceArea(for: sourceRow, col: sourceCol)
+        let sourcePosition = GridPosition(row: sourceRow, col: sourceCol)
+        
+        // Group affected cells by their distance from the source
+        var cellsByDistance: [Int: [(cellView: CellView, position: GridPosition, intensity: Int)]] = [:]
+        
+        for row in 0..<influenceArea.count {
+            for col in 0..<influenceArea[row].count {
+                if row == sourceRow && col == sourceCol { continue }
+                
+                if influenceArea[row][col] && row < cellViews.count && col < cellViews[row].count {
+                    let position = GridPosition(row: row, col: col)
+                    let distance = sourcePosition.distance(to: position)
+                    
+                    let intensity = viewModel.getInfluenceIntensity(
+                        from: sourceRow,
+                        sourceCol: sourceCol,
+                        to: row,
+                        targetCol: col
+                    )
+                    
+                    let cellView = cellViews[row][col]
+                    
+                    if cellsByDistance[distance] == nil {
+                        cellsByDistance[distance] = []
+                    }
+                    cellsByDistance[distance]?.append((cellView: cellView, position: position, intensity: intensity))
+                    
+                    // Mark this cell as being animated
+                    cellsBeingAnimated.insert(position)
+                }
+            }
+        }
+        
+        // Animate each distance ring with appropriate delays
+        let baseDelay: TimeInterval = 0.1
+        let ringDelay: TimeInterval = 0.08 // Delay between distance rings
+        
+        for distance in cellsByDistance.keys.sorted() {
+            guard let cellsAtDistance = cellsByDistance[distance] else { continue }
+            
+            let ringAnimationDelay = baseDelay + (TimeInterval(distance - 1) * ringDelay)
+            
+            // Animate all cells at this distance simultaneously (or with very small random offsets)
+            for (index, cellData) in cellsAtDistance.enumerated() {
+                let randomOffset = Double.random(in: 0...0.02) // Small random offset within the ring
+                let finalDelay = ringAnimationDelay + randomOffset
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + finalDelay) {
+                    // Show influence animation
+                    cellData.cellView.animateFieldInfluence(intensity: cellData.intensity, magnetType: magnetType)
+                    
+                    // Update this cell's visual state after the animation hits
+                    if let cell = viewModel.getCellAt(row: cellData.position.row, col: cellData.position.col),
+                       let previousState = previousStates[cellData.position] {
+                        
+                        // Update the cell view
+                        self.updateCellView(cellData.cellView, with: cell)
+                        
+                        // Apply special effect based on condition change
+                        if cell.isNeutralized && !previousState.isNeutralized {
+                            cellData.cellView.animateNeutralizationSuccess()
+                        } else if cell.isOvershot && !previousState.isOvershot {
+                            cellData.cellView.animateOvershootWarning()
+                        } else if cell.currentFieldValue != previousState.currentValue {
+                            cellData.cellView.animateValueChange(from: previousState.currentValue, to: cell.currentFieldValue)
+                        }
+                        
+                        // Remove from animation tracking
+                        self.cellsBeingAnimated.remove(cellData.position)
+                    }
+                }
+            }
+        }
+        
+        // Update the source cell immediately (it was directly affected)
+        if let sourceCell = viewModel.getCellAt(row: sourceRow, col: sourceCol),
+           let sourcePreviousState = previousStates[sourcePosition] {
+            let sourceCellView = cellViews[sourceRow][sourceCol]
+            updateCellView(sourceCellView, with: sourceCell)
+            
+            if sourceCell.isNeutralized && !sourcePreviousState.isNeutralized {
+                sourceCellView.animateNeutralizationSuccess()
+            } else if sourceCell.isOvershot && !sourcePreviousState.isOvershot {
+                sourceCellView.animateOvershootWarning()
+            } else if sourceCell.currentFieldValue != sourcePreviousState.currentValue {
+                sourceCellView.animateValueChange(from: sourcePreviousState.currentValue, to: sourceCell.currentFieldValue)
+            }
+        }
+    }
+    
+    private func showFieldInfluenceAnimation(sourceRow: Int, sourceCol: Int, magnetType: Int) {
+        guard let viewModel = viewModel else { return }
+        
+        let influenceArea = viewModel.getInfluenceArea(for: sourceRow, col: sourceCol)
+        let sourcePosition = GridPosition(row: sourceRow, col: sourceCol)
+        
+        // Group affected cells by their distance from the source
+        var cellsByDistance: [Int: [(row: Int, col: Int, intensity: Int)]] = [:]
+        
+        for row in 0..<influenceArea.count {
+            for col in 0..<influenceArea[row].count {
+                if row == sourceRow && col == sourceCol { continue }
+                
+                if influenceArea[row][col] && row < cellViews.count && col < cellViews[row].count {
+                    let position = GridPosition(row: row, col: col)
+                    let distance = sourcePosition.distance(to: position)
+                    
+                    let intensity = viewModel.getInfluenceIntensity(
+                        from: sourceRow,
+                        sourceCol: sourceCol,
+                        to: row,
+                        targetCol: col
+                    )
+                    
+                    if cellsByDistance[distance] == nil {
+                        cellsByDistance[distance] = []
+                    }
+                    cellsByDistance[distance]?.append((row: row, col: col, intensity: intensity))
+                }
+            }
+        }
+        
+        // Animate each distance ring with appropriate delays
+        let baseDelay: TimeInterval = 0.1
+        let ringDelay: TimeInterval = 0.08 // Delay between distance rings
+        
+        for distance in cellsByDistance.keys.sorted() {
+            guard let cellsAtDistance = cellsByDistance[distance] else { continue }
+            
+            let ringAnimationDelay = baseDelay + (TimeInterval(distance - 1) * ringDelay)
+            
+            // Animate all cells at this distance simultaneously (with small random offsets)
+            for cellData in cellsAtDistance {
+                let randomOffset = Double.random(in: 0...0.02) // Small random offset within the ring
+                let finalDelay = ringAnimationDelay + randomOffset
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + finalDelay) {
+                    self.cellViews[cellData.row][cellData.col].animateFieldInfluence(intensity: cellData.intensity, magnetType: magnetType)
+                }
+            }
+        }
+    }
+    
+    private func animateResetSequence(completion: @escaping () -> Void) {
+        guard let viewModel = viewModel else {
+            completion()
+            return
+        }
+        
+        // Mark all cells with magnets as being animated
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                if let cell = viewModel.getCellAt(row: row, col: col), cell.toolEffect != 0 {
+                    cellsBeingAnimated.insert(GridPosition(row: row, col: col))
+                }
+            }
+        }
+        
+        var animationCount = 0
+        var completedAnimations = 0
+        
+        // Count existing magnets
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                if let cell = viewModel.getCellAt(row: row, col: col), cell.toolEffect != 0 {
+                    animationCount += 1
+                }
+            }
+        }
+        
+        guard animationCount > 0 else {
+            completion()
+            return
+        }
+        
+        // Animate removal of all magnets
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                if let cell = viewModel.getCellAt(row: row, col: col), cell.toolEffect != 0 {
+                    let cellView = cellViews[row][col]
+                    
+                    animationController?.animateMagnetRemoval(
+                        at: GridPosition(row: row, col: col),
+                        cellView: cellView,
+                        removedType: cell.toolEffect
+                    ) {
+                        completedAnimations += 1
+                        if completedAnimations >= animationCount {
+                            // Clear all animation tracking before completion
+                            self.clearAnimationTracking()
+                            completion()
+                        }
+                    }
+                }
+            }
         }
     }
     

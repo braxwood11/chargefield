@@ -128,6 +128,8 @@ protocol TutorialAccessible: AnyObject {
     func getCellView(at row: Int, col: Int) -> UIView?
 }
 
+// MARK: - Grid Position Helper (already defined in FieldCalculator.swift)
+
 // MARK: - Enhanced Game Animation Controller
 class GameAnimationController {
     weak var viewController: UIViewController?
@@ -136,26 +138,174 @@ class GameAnimationController {
         self.viewController = viewController
     }
     
-    func animateMagnetPlacement(at position: GridPosition, completion: (() -> Void)? = nil) {
-        guard let view = viewController?.view else { return }
+    // MARK: - Magnet Placement Animation
+    func animateMagnetPlacement(at position: GridPosition, cellView: CellView, magnetType: Int, sourceButton: UIButton?, completion: (() -> Void)? = nil) {
         
-        // Create a pulse effect at the position
-        let pulseView = UIView()
-        pulseView.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.3)
-        pulseView.layer.cornerRadius = 20
-        pulseView.frame = CGRect(x: 0, y: 0, width: 40, height: 40)
-        pulseView.center = view.center // This should be calculated based on grid position
-        view.addSubview(pulseView)
+        // Create a flying magnet effect from button to cell (if source button is available)
+        if let sourceButton = sourceButton, let gameView = viewController?.view {
+            createFlyingMagnetEffect(from: sourceButton, to: cellView, magnetType: magnetType, in: gameView)
+        }
         
-        UIView.animate(withDuration: 0.3, animations: {
-            pulseView.transform = CGAffineTransform(scaleX: 2, y: 2)
-            pulseView.alpha = 0
-        }) { _ in
-            pulseView.removeFromSuperview()
+        // Animate the cell's magnet placement
+        cellView.animateMagnetPlacement(magnetType: magnetType) {
             completion?()
+        }
+        
+        // Add subtle screen shake for impact
+        addSubtleScreenShake()
+        
+        // Create ripple effect emanating from the cell
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.createRippleEffect(at: cellView)
         }
     }
     
+    // MARK: - Magnet Removal Animation
+    func animateMagnetRemoval(at position: GridPosition, cellView: CellView, removedType: Int, completion: (() -> Void)? = nil) {
+        
+        // Animate the cell's magnet removal
+        cellView.animateMagnetRemoval {
+            completion?()
+        }
+        
+        // Create energy dissipation effect
+        createEnergyDissipationEffect(at: cellView, magnetType: removedType)
+    }
+    
+    // MARK: - Flying Magnet Effect
+    private func createFlyingMagnetEffect(from sourceButton: UIButton, to targetCell: CellView, magnetType: Int, in containerView: UIView) {
+        
+        // Create temporary magnet view
+        let flyingMagnet = UIView()
+        flyingMagnet.backgroundColor = magnetType == 1 ?
+            UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0) :
+            UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
+        flyingMagnet.layer.cornerRadius = 12
+        flyingMagnet.frame = CGRect(x: 0, y: 0, width: 24, height: 24)
+        
+        // Add symbol
+        let symbolLabel = UILabel()
+        symbolLabel.text = magnetType == 1 ? "+" : "-"
+        symbolLabel.textColor = .white
+        symbolLabel.font = UIFont.boldSystemFont(ofSize: 16)
+        symbolLabel.textAlignment = .center
+        symbolLabel.frame = flyingMagnet.bounds
+        flyingMagnet.addSubview(symbolLabel)
+        
+        // Position at source button center
+        let sourceCenter = containerView.convert(sourceButton.center, from: sourceButton.superview)
+        flyingMagnet.center = sourceCenter
+        
+        containerView.addSubview(flyingMagnet)
+        
+        // Calculate target position
+        let targetCenter = containerView.convert(targetCell.center, from: targetCell.superview)
+        
+        // Animate flight path with slight arc
+        let controlPoint = CGPoint(
+            x: (sourceCenter.x + targetCenter.x) / 2,
+            y: min(sourceCenter.y, targetCenter.y) - 30
+        )
+        
+        // Create bezier path for curved flight
+        let path = UIBezierPath()
+        path.move(to: sourceCenter)
+        path.addQuadCurve(to: targetCenter, controlPoint: controlPoint)
+        
+        let pathAnimation = CAKeyframeAnimation(keyPath: "position")
+        pathAnimation.path = path.cgPath
+        pathAnimation.duration = 0.4
+        pathAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        
+        // Scale animation (grows then shrinks)
+        let scaleAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+        scaleAnimation.values = [1.0, 1.3, 0.8]
+        scaleAnimation.keyTimes = [0.0, 0.5, 1.0]
+        scaleAnimation.duration = 0.4
+        
+        // Combine animations
+        let animationGroup = CAAnimationGroup()
+        animationGroup.animations = [pathAnimation, scaleAnimation]
+        animationGroup.duration = 0.4
+        animationGroup.delegate = AnimationDelegate { [weak flyingMagnet] in
+            flyingMagnet?.removeFromSuperview()
+        }
+        
+        flyingMagnet.layer.add(animationGroup, forKey: "flyingMagnet")
+    }
+    
+    // MARK: - Visual Effects
+    private func createRippleEffect(at cellView: CellView) {
+        guard let containerView = cellView.superview else { return }
+        
+        // Create ripple view
+        let rippleView = UIView()
+        rippleView.layer.borderColor = TerminalTheme.Colors.primaryGreen.cgColor
+        rippleView.layer.borderWidth = 2
+        rippleView.backgroundColor = UIColor.clear
+        rippleView.layer.cornerRadius = cellView.bounds.width / 2
+        rippleView.frame = cellView.frame
+        rippleView.alpha = 0.8
+        
+        containerView.addSubview(rippleView)
+        
+        // Animate ripple expansion
+        UIView.animate(withDuration: 0.6, delay: 0, options: .curveEaseOut) {
+            rippleView.transform = CGAffineTransform(scaleX: 2.5, y: 2.5)
+            rippleView.alpha = 0
+        } completion: { _ in
+            rippleView.removeFromSuperview()
+        }
+    }
+    
+    private func createEnergyDissipationEffect(at cellView: CellView, magnetType: Int) {
+        let baseColor = magnetType == 1 ? UIColor.red : UIColor.blue
+        let particleCount = 8
+        
+        guard let containerView = cellView.superview else { return }
+        
+        for i in 0..<particleCount {
+            let particle = UIView()
+            particle.backgroundColor = baseColor.withAlphaComponent(0.7)
+            particle.frame = CGRect(x: 0, y: 0, width: 4, height: 4)
+            particle.layer.cornerRadius = 2
+            particle.center = cellView.center
+            
+            containerView.addSubview(particle)
+            
+            // Calculate random direction
+            let angle = Double(i) * (2 * Double.pi / Double(particleCount)) + Double.random(in: -0.3...0.3)
+            let distance = CGFloat.random(in: 30...50)
+            let endPoint = CGPoint(
+                x: cellView.center.x + CGFloat(cos(angle)) * distance,
+                y: cellView.center.y + CGFloat(sin(angle)) * distance
+            )
+            
+            // Animate particle dissipation
+            UIView.animate(withDuration: 0.8, delay: Double.random(in: 0...0.2), options: .curveEaseOut) {
+                particle.center = endPoint
+                particle.alpha = 0
+                particle.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+            } completion: { _ in
+                particle.removeFromSuperview()
+            }
+        }
+    }
+    
+    private func addSubtleScreenShake() {
+        guard let view = viewController?.view else { return }
+        
+        let shakeAnimation = CABasicAnimation(keyPath: "transform.translation.y")
+        shakeAnimation.fromValue = -2
+        shakeAnimation.toValue = 2
+        shakeAnimation.duration = 0.1
+        shakeAnimation.autoreverses = true
+        shakeAnimation.repeatCount = 2
+        
+        view.layer.add(shakeAnimation, forKey: "subtleShake")
+    }
+    
+    // MARK: - Puzzle Completion Animation (Enhanced)
     func animatePuzzleCompletion() {
         guard let gameVC = viewController as? GameViewController,
               let view = gameVC.view,
@@ -170,10 +320,10 @@ class GameAnimationController {
         performGridScan(gridView: gridView) { [weak self] in
             // Stage 2: Energy discharge wave
             self?.performEnergyWave(gameView: gameView, gridView: gridView) { [weak self] in
-                // Stage 3: Terminal success sequence
-                self?.performTerminalSuccess(gameView: gameView, gameVC: gameVC) { [weak self] in
-                    // Stage 4: Final celebration
-                    self?.performFinalCelebration(gameView: gameView, gameVC: gameVC)
+                // Stage 3: Celebration burst
+                self?.performCelebrationBurst(gameView: gameView, gridView: gridView) { [weak self] in
+                    // Stage 4: Final success display
+                    self?.performFinalSuccess(gameView: gameView, gameVC: gameVC)
                 }
             }
         }
@@ -265,194 +415,69 @@ class GameAnimationController {
         }
     }
     
-    // MARK: - Stage 3: Terminal Success Sequence
-    private func performTerminalSuccess(gameView: UIView, gameVC: GameViewController, completion: @escaping () -> Void) {
-        // Create terminal overlay
-        let terminalOverlay = createTerminalOverlay(frame: gameView.bounds)
-        gameView.addSubview(terminalOverlay)
+    // MARK: - Stage 3: Celebration Burst
+    private func performCelebrationBurst(gameView: UIView, gridView: UIView, completion: @escaping () -> Void) {
+        let centerPoint = gameView.convert(CGPoint(x: gridView.bounds.midX, y: gridView.bounds.midY), from: gridView)
         
-        // Animate terminal text
-        animateTerminalText(in: terminalOverlay) {
-            // Remove overlay after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                UIView.animate(withDuration: 0.5, animations: {
-                    terminalOverlay.alpha = 0
-                }) { _ in
-                    terminalOverlay.removeFromSuperview()
-                    completion()
-                }
-            }
+        // Create particle burst effect
+        for _ in 0..<15 {
+            let particle = createCelebrationParticle()
+            particle.center = centerPoint
+            gameView.addSubview(particle)
+            
+            animateCelebrationParticle(particle, from: centerPoint)
         }
         
         // Strong haptic feedback
         let notificationFeedback = UINotificationFeedbackGenerator()
         notificationFeedback.notificationOccurred(.success)
-    }
-    
-    private func createTerminalOverlay(frame: CGRect) -> UIView {
-        let overlay = UIView(frame: frame)
-        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.85)
-        overlay.alpha = 0
         
-        // Add scan lines effect
-        addScanLinesEffect(to: overlay)
-        
-        UIView.animate(withDuration: 0.3) {
-            overlay.alpha = 1
-        }
-        
-        return overlay
-    }
-    
-    private func addScanLinesEffect(to view: UIView) {
-        let scanLinesView = UIView(frame: view.bounds)
-        view.addSubview(scanLinesView)
-        
-        for i in stride(from: 0, to: Int(view.bounds.height), by: 4) {
-            let line = UIView(frame: CGRect(x: 0, y: CGFloat(i), width: view.bounds.width, height: 1))
-            line.backgroundColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.1)
-            scanLinesView.addSubview(line)
-        }
-        
-        // Animate scan lines
-        UIView.animate(withDuration: 2.0, delay: 0, options: [.repeat, .autoreverse], animations: {
-            scanLinesView.alpha = 0.7
-        })
-    }
-    
-    private func animateTerminalText(in container: UIView, completion: @escaping () -> Void) {
-        let messages = [
-            "FIELD HARMONIZATION COMPLETE",
-            "ALL ENERGY ANOMALIES NEUTRALIZED",
-            "CONTAINMENT SUCCESSFUL",
-            "EXCELLENT WORK, SPECIALIST"
-        ]
-        
-        let containerView = UIView()
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(containerView)
-        
-        NSLayoutConstraint.activate([
-            containerView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            containerView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            containerView.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: 0.8),
-            containerView.heightAnchor.constraint(equalToConstant: 200)
-        ])
-        
-        var currentMessageIndex = 0
-        
-        func showNextMessage() {
-            guard currentMessageIndex < messages.count else {
-                completion()
-                return
-            }
-            
-            let messageLabel = TerminalLabel()
-            messageLabel.style = .terminal
-            messageLabel.text = messages[currentMessageIndex]
-            messageLabel.textAlignment = .center
-            messageLabel.font = TerminalTheme.Fonts.monospaced(size: 18, weight: .bold)
-            messageLabel.alpha = 0
-            messageLabel.translatesAutoresizingMaskIntoConstraints = false
-            containerView.addSubview(messageLabel)
-            
-            NSLayoutConstraint.activate([
-                messageLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-                messageLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: CGFloat(currentMessageIndex * 40)),
-                messageLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-                messageLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor)
-            ])
-            
-            // Type-writer effect
-            typeWriterEffect(for: messageLabel, text: messages[currentMessageIndex]) {
-                currentMessageIndex += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showNextMessage()
-                }
-            }
-        }
-        
-        showNextMessage()
-    }
-    
-    private func typeWriterEffect(for label: UILabel, text: String, completion: @escaping () -> Void) {
-        label.text = ""
-        label.alpha = 1
-        
-        var characterIndex = 0
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
-            if characterIndex < text.count {
-                let index = text.index(text.startIndex, offsetBy: characterIndex)
-                label.text = String(text[..<index])
-                characterIndex += 1
-                
-                // Add cursor blink effect
-                if characterIndex % 2 == 0 {
-                    label.text! += "_"
-                }
-            } else {
-                timer.invalidate()
-                label.text = text
-                completion()
-            }
+        // Complete after particles
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            completion()
         }
     }
     
-    // MARK: - Stage 4: Final Celebration
-    private func performFinalCelebration(gameView: UIView, gameVC: GameViewController) {
-        // Show success message with new styling
-        gameVC.showCompletionMessage()
-        
-        // Create particle burst effect
-        createParticleBurst(in: gameView)
-        
-        // Final haptic sequence
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-            impactFeedback.impactOccurred()
-        }
-    }
-    
-    private func createParticleBurst(in view: UIView) {
-        let centerPoint = CGPoint(x: view.bounds.width / 2, y: view.bounds.height / 2)
-        
-        for _ in 0..<12 {
-            let particle = createParticle()
-            particle.center = centerPoint
-            view.addSubview(particle)
-            
-            animateParticle(particle, from: centerPoint)
-        }
-    }
-    
-    private func createParticle() -> UIView {
-        let particle = UIView(frame: CGRect(x: 0, y: 0, width: 4, height: 4))
-        particle.backgroundColor = TerminalTheme.Colors.primaryGreen
-        particle.layer.cornerRadius = 2
-        particle.alpha = 0.8
+    private func createCelebrationParticle() -> UIView {
+        let particle = UIView(frame: CGRect(x: 0, y: 0, width: 6, height: 6))
+        particle.backgroundColor = [UIColor.green, UIColor.yellow, TerminalTheme.Colors.primaryGreen].randomElement()
+        particle.layer.cornerRadius = 3
+        particle.alpha = 0.9
         
         // Add glow
-        particle.layer.shadowColor = TerminalTheme.Colors.primaryGreen.cgColor
+        particle.layer.shadowColor = particle.backgroundColor?.cgColor
         particle.layer.shadowOffset = CGSize.zero
-        particle.layer.shadowRadius = 3
+        particle.layer.shadowRadius = 4
         particle.layer.shadowOpacity = 1.0
         
         return particle
     }
     
-    private func animateParticle(_ particle: UIView, from startPoint: CGPoint) {
+    private func animateCelebrationParticle(_ particle: UIView, from startPoint: CGPoint) {
         let angle = Double.random(in: 0...(2 * Double.pi))
-        let distance = CGFloat.random(in: 100...200)
+        let distance = CGFloat.random(in: 80...150)
         
-        let endX = startPoint.x + cos(angle) * distance
-        let endY = startPoint.y + sin(angle) * distance
+        let endX = startPoint.x + CGFloat(cos(angle)) * distance
+        let endY = startPoint.y + CGFloat(sin(angle)) * distance
         
-        UIView.animate(withDuration: 1.5, delay: 0, options: .curveEaseOut, animations: {
+        UIView.animate(withDuration: 1.5, delay: Double.random(in: 0...0.3), options: .curveEaseOut, animations: {
             particle.center = CGPoint(x: endX, y: endY)
             particle.alpha = 0
             particle.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
         }) { _ in
             particle.removeFromSuperview()
+        }
+    }
+    
+    // MARK: - Stage 4: Final Success
+    private func performFinalSuccess(gameView: UIView, gameVC: GameViewController) {
+        // Show success message with enhanced styling
+        gameVC.showCompletionMessage()
+        
+        // Final haptic sequence
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+            impactFeedback.impactOccurred()
         }
     }
     
@@ -464,6 +489,20 @@ class GameAnimationController {
                 view.transform = .identity
             }
         }
+    }
+}
+
+// MARK: - Animation Delegate Helper
+private class AnimationDelegate: NSObject, CAAnimationDelegate {
+    private let completion: () -> Void
+    
+    init(completion: @escaping () -> Void) {
+        self.completion = completion
+        super.init()
+    }
+    
+    func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
+        completion()
     }
 }
 
@@ -596,4 +635,3 @@ extension GameViewController {
         cellView.selectedMagnetType = viewModel?.getSelectedMagnetType() ?? 1
     }
 }
-
