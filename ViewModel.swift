@@ -24,6 +24,33 @@ class GameViewModel {
     private let totalNegativeMagnets: Int
     
     weak var delegate: GameStateDelegate?
+
+    // MARK: - Validation Methods
+    func canPlaceMagnet(type: Int, at row: Int, col: Int) -> Bool {
+        guard row >= 0 && row < gridSize && col >= 0 && col < gridSize else {
+            return false
+        }
+        
+        guard let cell = getCellAt(row: row, col: col) else {
+            return false
+        }
+        
+        // Check if cell is placeable
+        guard cell.placeable else { return false }
+        
+        // Check if puzzle is already solved (unless showing solution)
+        guard !gameState.puzzleSolved || gameState.showSolution else { return false }
+        
+        // Check magnet availability based on type
+        switch type {
+        case 1: // Positive magnet
+            return gameState.availableMagnets.positive > 0
+        case -1: // Negative magnet
+            return gameState.availableMagnets.negative > 0
+        default:
+            return false
+        }
+    }
     
     // MARK: - Initialization
     init(puzzle: PuzzleDefinition) {
@@ -444,3 +471,4 @@ struct PuzzleInfo {
         return max(0, currentScore / perfectScore)
     }
 }
+

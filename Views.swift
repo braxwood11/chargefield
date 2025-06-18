@@ -135,6 +135,10 @@ class CellView: UIView {
         bringSubviewToFront(chargeBackground)
         bringSubviewToFront(chargeLabel)
         bringSubviewToFront(magnetView)
+        
+        if !magnetView.isHidden {
+                ensureMagnetIsCircular()
+            }
     }
     
     // Update the appearance based on cell data
@@ -167,22 +171,52 @@ class CellView: UIView {
         
         // Show magnet if present with much brighter colors
         if cell.toolEffect != 0 {
-                magnetView.isHidden = false
-                if cell.toolEffect > 0 {
-                    magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0) // Deeper red
-                } else {
-                    magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0) // Deeper blue
-                }
-                magnetSymbol.text = cell.toolEffect > 0 ? "+" : "-"
+            magnetView.isHidden = false
+            if cell.toolEffect > 0 {
+                magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0)
+                magnetSymbol.text = "+"
             } else {
-                magnetView.isHidden = true
+                magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
+                magnetSymbol.text = "-"
             }
+            
+            // CRITICAL: Ensure magnet is always circular
+            ensureMagnetIsCircular()
+            
+        } else {
+            magnetView.isHidden = true
+        }
         
         // Update neutralization status
         updateNeutralizationStatus()
         
         // Show selection overlay if selected
         updateSelectionAppearance()
+    }
+    
+    private func ensureMagnetIsCircular() {
+        // Reset any leftover transforms that might cause issues
+        if magnetView.transform != .identity {
+            magnetView.transform = .identity
+        }
+        
+        // Recalculate and apply the correct corner radius
+        let isSmallCell = bounds.width < 60
+        let magnetSize: CGFloat = isSmallCell ? 24 : 30
+        
+        // Ensure the frame is correct
+        magnetView.frame = CGRect(
+            x: (bounds.width - magnetSize) / 2,
+            y: (bounds.height - magnetSize) / 2,
+            width: magnetSize,
+            height: magnetSize
+        )
+        
+        // Set corner radius to exactly half the width for perfect circle
+        magnetView.layer.cornerRadius = magnetSize / 2
+        
+        // Ensure symbol is centered
+        magnetSymbol.frame = magnetView.bounds
     }
     
     // Update the neutralization status and visualization
@@ -544,34 +578,62 @@ class CellView: UIView {
     
     // MARK: - Animation Methods
     
+    /// Prepare magnet for animation without showing it
+    func prepareMagnetForAnimation(magnetType: Int) {
+        // Update the cell's underlying data but don't show the magnet yet
+        updateMagnetAppearance(magnetType: magnetType)
+        
+        // Store the current corner radius before hiding
+        let currentCornerRadius = magnetView.layer.cornerRadius
+        
+        magnetView.isHidden = true
+        magnetView.alpha = 0
+        magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        
+        // Scale down the corner radius to match the small transform
+        magnetView.layer.cornerRadius = currentCornerRadius * 0.1
+    }
+
     /// Animate magnet placement with magnetic snap effect
     func animateMagnetPlacement(magnetType: Int, completion: (() -> Void)? = nil) {
-        guard let cell = cell else { return }
-        
         // Store original state
         let originalTransform = magnetView.transform
         let originalAlpha = magnetView.alpha
         
-        // Start with magnet invisible and scaled down
+        // Start with magnet completely hidden - DON'T show it yet
         magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
         magnetView.alpha = 0
-        magnetView.isHidden = false
+        magnetView.isHidden = true // Keep it hidden until animation starts
         
-        // Update magnet appearance
+        // Update magnet appearance but keep it hidden
         updateMagnetAppearance(magnetType: magnetType)
+        
+        // Store the original corner radius
+        let originalCornerRadius = magnetView.layer.cornerRadius
         
         // Create placement effect with haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
+        // Show the magnet only when animation starts
+        magnetView.isHidden = false
+        
+        // Scale the corner radius down for the initial small state
+        magnetView.layer.cornerRadius = originalCornerRadius * 0.1
+        
         // Magnetic snap animation with bounce
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .curveEaseOut) {
             self.magnetView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
             self.magnetView.alpha = 1.0
+            // Scale corner radius up to slightly larger than normal
+            self.magnetView.layer.cornerRadius = originalCornerRadius * 1.1
         } completion: { _ in
             UIView.animate(withDuration: 0.1) {
                 self.magnetView.transform = originalTransform
+                // Reset corner radius to normal
+                self.magnetView.layer.cornerRadius = originalCornerRadius
             } completion: { _ in
+                // Call completion AFTER the magnet has actually appeared
                 completion?()
             }
         }
@@ -582,29 +644,29 @@ class CellView: UIView {
     
     /// Animate magnet removal with dissolution effect
     func animateMagnetRemoval(completion: (() -> Void)? = nil) {
-        guard !magnetView.isHidden else {
-            completion?()
-            return
+            guard !magnetView.isHidden else {
+                completion?()
+                return
+            }
+            
+            // Light haptic feedback for removal
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+            
+            // Create particle dissolution effect
+            createRemovalParticles()
+            
+            // Scale down and fade out
+            UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn) {
+                self.magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+                self.magnetView.alpha = 0
+            } completion: { _ in
+                self.magnetView.isHidden = true
+                self.magnetView.transform = .identity
+                self.magnetView.alpha = 1.0
+                completion?()
+            }
         }
-        
-        // Light haptic feedback for removal
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
-        
-        // Create particle dissolution effect
-        createRemovalParticles()
-        
-        // Scale down and fade out
-        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn) {
-            self.magnetView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
-            self.magnetView.alpha = 0
-        } completion: { _ in
-            self.magnetView.isHidden = true
-            self.magnetView.transform = .identity
-            self.magnetView.alpha = 1.0
-            completion?()
-        }
-    }
     
     /// Animate field influence effect on affected cells
     func animateFieldInfluence(intensity: Int, magnetType: Int) {
@@ -749,6 +811,40 @@ class CellView: UIView {
         } else {
             magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
             magnetSymbol.text = "-"
+        }
+        
+        // Ensure the magnet stays circular by updating corner radius
+        // This should match the calculation from layoutSubviews
+        let isSmallCell = bounds.width < 60
+        let magnetSize: CGFloat = isSmallCell ? 24 : 30
+        magnetView.layer.cornerRadius = magnetSize / 2
+    }
+    
+    // Add the giant flash effect method
+    private func createGiantFlashEffect(magnetType: Int) {
+        // Create a large flash view that covers the entire cell and beyond
+        let flashView = UIView()
+        flashView.backgroundColor = magnetType == 1 ?
+            UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 0.8) :  // Bright red
+            UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 0.8)    // Bright blue
+        
+        // Make it much larger than the cell
+        flashView.frame = bounds.insetBy(dx: -20, dy: -20)
+        flashView.layer.cornerRadius = flashView.frame.width / 2
+        flashView.alpha = 0
+        insertSubview(flashView, at: 0) // Behind the magnet
+        
+        // Giant flash animation - quick bright flash then fade
+        UIView.animate(withDuration: 0.15, delay: 0, options: .curveEaseOut) {
+            flashView.alpha = 1.0
+            flashView.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
+                flashView.alpha = 0
+                flashView.transform = CGAffineTransform(scaleX: 2.5, y: 2.5)
+            } completion: { _ in
+                flashView.removeFromSuperview()
+            }
         }
     }
     

@@ -379,6 +379,7 @@ class GameViewController: UIViewController {
         }
     }
     
+    // Update the updateCellViews method to respect animation tracking
     private func updateCellViews() {
         guard let viewModel = viewModel else { return }
         
@@ -416,7 +417,19 @@ class GameViewController: UIViewController {
     
     private func updateMessageView() {
         guard let viewModel = viewModel else { return }
-        messageView?.isHidden = !(viewModel.isPuzzleSolved() && !viewModel.isShowingSolution())
+        
+        // Only show the message view if puzzle is solved AND we're not showing the solution
+        // BUT don't actually make it visible yet - let the animation controller handle that
+        let shouldBeVisible = viewModel.isPuzzleSolved() && !viewModel.isShowingSolution()
+        
+        if shouldBeVisible {
+            // Prepare the message view but keep it hidden
+            // The animation controller will make it visible at the right time
+            messageView?.setMessage("⚡ ENERGY HARMONIZED ⚡")
+            // Don't set isHidden = false here, let showCompletionMessage() handle the timing
+        } else {
+            messageView?.isHidden = true
+        }
     }
     
     // MARK: - Actions
@@ -427,7 +440,7 @@ class GameViewController: UIViewController {
             navigationController?.popViewController(animated: true)
         }
     }
-    
+
     @objc func cellTapped(_ gesture: UITapGestureRecognizer) {
         guard let cellView = gesture.view as? CellView,
               let viewModel = viewModel else { return }
@@ -451,6 +464,7 @@ class GameViewController: UIViewController {
             // Mark cells that will be affected by removal as being animated
             markAffectedCellsAsAnimating(sourceRow: row, sourceCol: col)
             
+            // Update model immediately for removal (this is fine since we're removing)
             viewModel.removeMagnetDirectly(at: row, col: col)
             clearAllInfluencePreviews()
             
@@ -468,35 +482,66 @@ class GameViewController: UIViewController {
         
         // Handle selection and placement
         if let cell = viewModel.getCellAt(row: row, col: col), cell.isSelected {
+            // Get the selected magnet type
+            let selectedMagnetType = viewModel.getSelectedMagnetType()
+            
+            // VALIDATE the placement first without updating the model
+            if !canPlaceMagnet(type: selectedMagnetType, at: row, col: col) {
+                // Clear selection and return
+                viewModel.selectCell(at: row, col: col) // This will deselect
+                return
+            }
+            
             // Store current field states before placement
             let prePlacementFieldStates = captureCurrentFieldStates()
             
-            viewModel.placeOrRemoveMagnet(at: row, col: col)
+            // Mark the target cell as being animated to prevent premature updates
+            cellsBeingAnimated.insert(GridPosition(row: row, col: col))
+            
+            // Clear influence previews
             clearAllInfluencePreviews()
             
-            // Check if a magnet was actually placed
-            let newToolEffect = viewModel.getCellAt(row: row, col: col)?.toolEffect ?? 0
-            if newToolEffect != 0 && newToolEffect != previousToolEffect {
-                // Animate placement but don't update field visuals yet
-                animationController?.animateMagnetPlacement(at: GridPosition(row: row, col: col),
-                                                          cellView: cellView,
-                                                          magnetType: newToolEffect,
-                                                          sourceButton: newToolEffect == 1 ? positiveButton : negativeButton)
+            // Prepare the cell for animation but don't show the magnet yet
+            cellView.prepareMagnetForAnimation(magnetType: selectedMagnetType)
+            
+            // Start the placement animation
+            animationController?.animateMagnetPlacement(
+                at: GridPosition(row: row, col: col),
+                cellView: cellView,
+                magnetType: selectedMagnetType,
+                sourceButton: selectedMagnetType == 1 ? positiveButton : negativeButton
+            ) {
+                // ONLY NOW update the model after the magnet has visually landed
+                self.viewModel?.placeOrRemoveMagnet(at: row, col: col)
                 
-                // Show field influence animation with delayed visual updates
-                showFieldInfluenceAnimationWithDelayedUpdates(sourceRow: row, sourceCol: col,
-                                                            magnetType: newToolEffect,
-                                                            previousStates: prePlacementFieldStates)
+                // Remove this cell from animation tracking since the magnet has landed
+                self.cellsBeingAnimated.remove(GridPosition(row: row, col: col))
+                
+                // Now start the field influence animations
+                self.showFieldInfluenceAnimationWithDelayedUpdates(
+                    sourceRow: row, sourceCol: col,
+                    magnetType: selectedMagnetType,
+                    previousStates: prePlacementFieldStates
+                )
+                
+                // Update session tracking
+                self.gameSession?.moveCount += 1
+                GameProgressManager.shared.recordMagnetPlaced()
             }
             
-            gameSession?.moveCount += 1
-            GameProgressManager.shared.recordMagnetPlaced()
         } else {
+            // Selection case - this is immediate and doesn't need animation delays
             viewModel.selectCell(at: row, col: col)
             showInfluencePreview(row: row, col: col)
         }
     }
-    
+
+    // Add this helper method to validate magnet placement without updating the model
+    private func canPlaceMagnet(type: Int, at row: Int, col: Int) -> Bool {
+        guard let viewModel = viewModel else { return false }
+        return viewModel.canPlaceMagnet(type: type, at: row, col: col)
+    }
+
     @objc private func magnetButtonTapped(_ sender: MagnetButton) {
         viewModel?.setSelectedMagnetType(sender.toolType)
         updateMagnetButtons()
@@ -540,6 +585,19 @@ class GameViewController: UIViewController {
             sender.transform = .identity
             sender.alpha = 1.0
         }
+    }
+    
+    // MARK: - Animation Controller Access
+    func getCellViews() -> [[CellView]] {
+        return cellViews
+    }
+
+    // Also add this method to get a specific cell view (useful for animations)
+    func getCellViewAt(row: Int, col: Int) -> CellView? {
+        guard row >= 0 && row < cellViews.count && col >= 0 && col < cellViews[row].count else {
+            return nil
+        }
+        return cellViews[row][col]
     }
     
     // MARK: - Animation Helper Methods
@@ -596,6 +654,7 @@ class GameViewController: UIViewController {
         }
     }
     
+    // Replace the showFieldInfluenceAnimationWithDelayedUpdates method with this version
     private func showFieldInfluenceAnimationWithDelayedUpdates(sourceRow: Int, sourceCol: Int, magnetType: Int, previousStates: [GridPosition: (currentValue: Int, isNeutralized: Bool, isOvershot: Bool)]) {
         guard let viewModel = viewModel else { return }
         
@@ -634,7 +693,7 @@ class GameViewController: UIViewController {
         }
         
         // Animate each distance ring with appropriate delays
-        let baseDelay: TimeInterval = 0.1
+        let baseDelay: TimeInterval = 0.15  // Increased to give magnet time to land
         let ringDelay: TimeInterval = 0.08 // Delay between distance rings
         
         for distance in cellsByDistance.keys.sorted() {
@@ -674,7 +733,7 @@ class GameViewController: UIViewController {
             }
         }
         
-        // Update the source cell immediately (it was directly affected)
+        // Update the source cell immediately since the magnet has already landed there
         if let sourceCell = viewModel.getCellAt(row: sourceRow, col: sourceCol),
            let sourcePreviousState = previousStates[sourcePosition] {
             let sourceCellView = cellViews[sourceRow][sourceCol]
@@ -883,10 +942,30 @@ extension GameViewController: GameStateDelegate {
     }
     
     func puzzleSolved() {
-        updateMessageView()
-        animationController?.animatePuzzleCompletion()
-        showCompletionMessage()
+        // DON'T show message or start animations immediately
+        // Instead, wait for any ongoing animations to complete
         
+        // Check if there are any cells being animated
+        if !cellsBeingAnimated.isEmpty {
+            // Wait for animations to complete before starting celebration
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.startPuzzleCompletionSequence()
+            }
+        } else {
+            // No animations running, start immediately
+            startPuzzleCompletionSequence()
+        }
+    }
+    
+    // Add this new method to handle the completion sequence
+    private func startPuzzleCompletionSequence() {
+        // Update the message view state (but don't show banner yet)
+        updateMessageView()
+        
+        // Start the completion animation, which will show the banner at the right time
+        animationController?.animatePuzzleCompletion()
+        
+        // Handle progress tracking
         if let session = gameSession {
             GameProgressManager.shared.clearCurrentPuzzle()
             

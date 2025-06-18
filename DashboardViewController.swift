@@ -249,6 +249,14 @@ class DashboardViewController: UIViewController {
         readOnlyIcon.image = UIImage(systemName: "eye", withConfiguration: config)
         readOnlyIcon.tintColor = TerminalTheme.Colors.primaryGreen.withAlphaComponent(0.6)
         readOnlyIcon.translatesAutoresizingMaskIntoConstraints = false
+        readOnlyIcon.contentMode = .scaleAspectFit
+
+        // Add explicit size constraints to prevent stretching
+        readOnlyIcon.setContentHuggingPriority(.required, for: .horizontal)
+        readOnlyIcon.setContentHuggingPriority(.required, for: .vertical)
+        readOnlyIcon.setContentCompressionResistancePriority(.required, for: .horizontal)
+        readOnlyIcon.setContentCompressionResistancePriority(.required, for: .vertical)
+
         terminalPromptView.addSubview(readOnlyIcon)
         
         // Current path label
@@ -277,10 +285,13 @@ class DashboardViewController: UIViewController {
             terminalPromptView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             terminalPromptView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             terminalPromptView.heightAnchor.constraint(equalToConstant: 40),
-            
+                
             readOnlyIcon.leadingAnchor.constraint(equalTo: terminalPromptView.leadingAnchor, constant: 15),
             readOnlyIcon.centerYAnchor.constraint(equalTo: terminalPromptView.centerYAnchor),
-            
+                // ADD THESE SIZE CONSTRAINTS:
+            readOnlyIcon.widthAnchor.constraint(equalToConstant: 16),
+            readOnlyIcon.heightAnchor.constraint(equalToConstant: 16),
+                
             currentPathLabel.leadingAnchor.constraint(equalTo: readOnlyIcon.trailingAnchor, constant: 8),
             currentPathLabel.centerYAnchor.constraint(equalTo: terminalPromptView.centerYAnchor),
             currentPathLabel.trailingAnchor.constraint(equalTo: terminalPromptView.trailingAnchor, constant: -15),

@@ -143,20 +143,34 @@ class GameAnimationController {
         
         // Create a flying magnet effect from button to cell (if source button is available)
         if let sourceButton = sourceButton, let gameView = viewController?.view {
-            createFlyingMagnetEffect(from: sourceButton, to: cellView, magnetType: magnetType, in: gameView)
-        }
-        
-        // Animate the cell's magnet placement
-        cellView.animateMagnetPlacement(magnetType: magnetType) {
-            completion?()
-        }
-        
-        // Add subtle screen shake for impact
-        addSubtleScreenShake()
-        
-        // Create ripple effect emanating from the cell
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.createRippleEffect(at: cellView)
+            // Start the flying effect and wait for it to complete before showing the cell magnet
+            createFlyingMagnetEffect(from: sourceButton, to: cellView, magnetType: magnetType, in: gameView) {
+                // ONLY start the cell magnet animation after the flying magnet reaches the target
+                cellView.animateMagnetPlacement(magnetType: magnetType) {
+                    completion?()
+                }
+                
+                // Add subtle screen shake for impact when the magnet lands
+                self.addSubtleScreenShake()
+                
+                // Create ripple effect emanating from the cell
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.createRippleEffect(at: cellView)
+                }
+            }
+        } else {
+            // No flying effect, just animate the cell's magnet placement directly
+            cellView.animateMagnetPlacement(magnetType: magnetType) {
+                completion?()
+            }
+            
+            // Add subtle screen shake for impact
+            addSubtleScreenShake()
+            
+            // Create ripple effect emanating from the cell
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.createRippleEffect(at: cellView)
+            }
         }
     }
     
@@ -172,8 +186,8 @@ class GameAnimationController {
         createEnergyDissipationEffect(at: cellView, magnetType: removedType)
     }
     
-    // MARK: - Flying Magnet Effect
-    private func createFlyingMagnetEffect(from sourceButton: UIButton, to targetCell: CellView, magnetType: Int, in containerView: UIView) {
+    // MARK: - Flying Magnet Effect (Updated)
+    private func createFlyingMagnetEffect(from sourceButton: UIButton, to targetCell: CellView, magnetType: Int, in containerView: UIView, completion: @escaping () -> Void) {
         
         // Create temporary magnet view
         let flyingMagnet = UIView()
@@ -229,6 +243,7 @@ class GameAnimationController {
         animationGroup.duration = 0.4
         animationGroup.delegate = AnimationDelegate { [weak flyingMagnet] in
             flyingMagnet?.removeFromSuperview()
+            completion() // Call completion when flying animation finishes
         }
         
         flyingMagnet.layer.add(animationGroup, forKey: "flyingMagnet")
@@ -305,25 +320,25 @@ class GameAnimationController {
         view.layer.add(shakeAnimation, forKey: "subtleShake")
     }
     
-    // MARK: - Puzzle Completion Animation (Enhanced)
+    // MARK: - Puzzle Completion Animation (Subtle Technical Style)
     func animatePuzzleCompletion() {
         guard let gameVC = viewController as? GameViewController,
               let view = gameVC.view,
               let gridView = gameVC.gridView else { return }
         
-        // Start the completion sequence
-        performCompletionSequence(gameView: view, gridView: gridView, gameVC: gameVC)
+        // Start the refined completion sequence
+        performRefinedCompletionSequence(gameView: view, gridView: gridView, gameVC: gameVC)
     }
-    
-    private func performCompletionSequence(gameView: UIView, gridView: UIView, gameVC: GameViewController) {
-        // Stage 1: Grid scan effect
+
+    private func performRefinedCompletionSequence(gameView: UIView, gridView: UIView, gameVC: GameViewController) {
+        // Stage 1: Grid scan effect (keep as-is)
         performGridScan(gridView: gridView) { [weak self] in
-            // Stage 2: Energy discharge wave
-            self?.performEnergyWave(gameView: gameView, gridView: gridView) { [weak self] in
-                // Stage 3: Celebration burst
-                self?.performCelebrationBurst(gameView: gameView, gridView: gridView) { [weak self] in
-                    // Stage 4: Final success display
-                    self?.performFinalSuccess(gameView: gameView, gameVC: gameVC)
+            // Stage 2: Pulse neutralized cells to highlight achievement
+            self?.performNeutralizedCellsPulse(gameVC: gameVC) { [weak self] in
+                // Stage 3: Energy discharge wave (keep as-is)
+                self?.performEnergyWave(gameView: gameView, gridView: gridView) { [weak self] in
+                    // Stage 4: Show success banner
+                    self?.performFinalSuccessWithBanner(gameView: gameView, gameVC: gameVC)
                 }
             }
         }
@@ -415,68 +430,112 @@ class GameAnimationController {
         }
     }
     
-    // MARK: - Stage 3: Celebration Burst
-    private func performCelebrationBurst(gameView: UIView, gridView: UIView, completion: @escaping () -> Void) {
-        let centerPoint = gameView.convert(CGPoint(x: gridView.bounds.midX, y: gridView.bounds.midY), from: gridView)
-        
-        // Create particle burst effect
-        for _ in 0..<15 {
-            let particle = createCelebrationParticle()
-            particle.center = centerPoint
-            gameView.addSubview(particle)
-            
-            animateCelebrationParticle(particle, from: centerPoint)
+    // MARK: - Stage 3: Pulse Neutralized Cells
+    private func performNeutralizedCellsPulse(gameVC: GameViewController, completion: @escaping () -> Void) {
+        guard let viewModel = gameVC.viewModel else {
+            completion()
+            return
         }
         
-        // Strong haptic feedback
-        let notificationFeedback = UINotificationFeedbackGenerator()
-        notificationFeedback.notificationOccurred(.success)
+        // Find all neutralized cells
+        var neutralizedCells: [(cellView: CellView, row: Int, col: Int)] = []
         
-        // Complete after particles
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        let cellViews = gameVC.getCellViews()
+        for row in 0..<cellViews.count {
+            for col in 0..<cellViews[row].count {
+                if let cell = viewModel.getCellAt(row: row, col: col),
+                   cell.isNeutralized {
+                    let cellView = cellViews[row][col]
+                    neutralizedCells.append((cellView: cellView, row: row, col: col))
+                }
+            }
+        }
+        
+        guard !neutralizedCells.isEmpty else {
+            completion()
+            return
+        }
+        
+        // Pulse each neutralized cell with varying delays and intensities
+        let maxDelay: TimeInterval = 1.2
+        
+        for (index, cellData) in neutralizedCells.enumerated() {
+            // Stagger the pulses
+            let delay = Double.random(in: 0...maxDelay)
+            let intensity = Float.random(in: 0.6...1.0)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                self.pulseNeutralizedCell(cellData.cellView, intensity: intensity)
+            }
+        }
+        
+        // Light haptic feedback when cells start pulsing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+        }
+        
+        // Complete after all pulses have had time to finish
+        DispatchQueue.main.asyncAfter(deadline: .now() + maxDelay + 1.0) {
             completion()
         }
     }
-    
-    private func createCelebrationParticle() -> UIView {
-        let particle = UIView(frame: CGRect(x: 0, y: 0, width: 6, height: 6))
-        particle.backgroundColor = [UIColor.green, UIColor.yellow, TerminalTheme.Colors.primaryGreen].randomElement()
-        particle.layer.cornerRadius = 3
-        particle.alpha = 0.9
+
+    // Pulse individual neutralized cell
+    private func pulseNeutralizedCell(_ cellView: CellView, intensity: Float) {
+        // Create a subtle glow effect overlay
+        let glowOverlay = UIView()
+        glowOverlay.backgroundColor = UIColor.green.withAlphaComponent(0.0)
+        glowOverlay.frame = cellView.bounds.insetBy(dx: -2, dy: -2)
+        glowOverlay.layer.cornerRadius = 6
+        glowOverlay.layer.borderWidth = 2
+        glowOverlay.layer.borderColor = UIColor.green.withAlphaComponent(0.0).cgColor
+        cellView.insertSubview(glowOverlay, at: 0)
         
-        // Add glow
-        particle.layer.shadowColor = particle.backgroundColor?.cgColor
-        particle.layer.shadowOffset = CGSize.zero
-        particle.layer.shadowRadius = 4
-        particle.layer.shadowOpacity = 1.0
+        // Add glow shadow
+        glowOverlay.layer.shadowColor = UIColor.green.cgColor
+        glowOverlay.layer.shadowOffset = CGSize.zero
+        glowOverlay.layer.shadowRadius = 8
+        glowOverlay.layer.shadowOpacity = 0
         
-        return particle
-    }
-    
-    private func animateCelebrationParticle(_ particle: UIView, from startPoint: CGPoint) {
-        let angle = Double.random(in: 0...(2 * Double.pi))
-        let distance = CGFloat.random(in: 80...150)
+        // Pulse animation - fade in then out
+        let pulseIntensity = CGFloat(intensity)
         
-        let endX = startPoint.x + CGFloat(cos(angle)) * distance
-        let endY = startPoint.y + CGFloat(sin(angle)) * distance
-        
-        UIView.animate(withDuration: 1.5, delay: Double.random(in: 0...0.3), options: .curveEaseOut, animations: {
-            particle.center = CGPoint(x: endX, y: endY)
-            particle.alpha = 0
-            particle.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseOut, animations: {
+            glowOverlay.backgroundColor = UIColor.green.withAlphaComponent(0.2 * pulseIntensity)
+            glowOverlay.layer.borderColor = UIColor.green.withAlphaComponent(0.6 * pulseIntensity).cgColor
+            glowOverlay.layer.shadowOpacity = Float(0.8 * pulseIntensity)
+            glowOverlay.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
         }) { _ in
-            particle.removeFromSuperview()
+            UIView.animate(withDuration: 0.6, delay: 0, options: .curveEaseIn, animations: {
+                glowOverlay.backgroundColor = UIColor.green.withAlphaComponent(0.0)
+                glowOverlay.layer.borderColor = UIColor.green.withAlphaComponent(0.0).cgColor
+                glowOverlay.layer.shadowOpacity = 0
+                glowOverlay.transform = .identity
+            }) { _ in
+                glowOverlay.removeFromSuperview()
+            }
+        }
+        
+        // Subtle scale pulse on the cell itself
+        UIView.animate(withDuration: 0.3, delay: 0.1, options: .curveEaseOut, animations: {
+            cellView.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+        }) { _ in
+            UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseIn, animations: {
+                cellView.transform = .identity
+            })
         }
     }
     
+    
     // MARK: - Stage 4: Final Success
-    private func performFinalSuccess(gameView: UIView, gameVC: GameViewController) {
-        // Show success message with enhanced styling
+    private func performFinalSuccessWithBanner(gameView: UIView, gameVC: GameViewController) {
+        // Show the success message banner
         gameVC.showCompletionMessage()
         
-        // Final haptic sequence
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        // Medium haptic feedback for success
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
         }
     }
@@ -509,39 +568,47 @@ private class AnimationDelegate: NSObject, CAAnimationDelegate {
 // MARK: - Enhanced Message View
 extension GameViewController {
     
-     func showCompletionMessage() {
+    func showCompletionMessage() {
         guard let messageView = messageView else { return }
         
-        // Update the message
-        messageView.setMessage("⚡ MISSION ACCOMPLISHED ⚡")
+        // Make sure it starts hidden
         messageView.isHidden = false
-        
-        // Enhanced appearance animation
         messageView.alpha = 0
-        messageView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        messageView.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        
+        // Update the message
+        messageView.setMessage("⚡ ENERGY HARMONIZED ⚡")
         
         // Add border glow effect
         messageView.layer.shadowColor = TerminalTheme.Colors.primaryGreen.cgColor
         messageView.layer.shadowOffset = CGSize.zero
         messageView.layer.shadowRadius = 15
-        messageView.layer.shadowOpacity = 0.8
+        messageView.layer.shadowOpacity = 0
         
-        UIView.animate(withDuration: 0.6, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .curveEaseOut, animations: {
+        // Dramatic entrance animation
+        UIView.animate(withDuration: 0.8, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .curveEaseOut, animations: {
             messageView.alpha = 1
-            messageView.transform = .identity
+            messageView.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+            messageView.layer.shadowOpacity = 0.8
         }) { _ in
-            // Add pulsing glow
-            self.addPulsingGlow(to: messageView)
+            // Settle to normal size
+            UIView.animate(withDuration: 0.3, animations: {
+                messageView.transform = .identity
+            }) { _ in
+                // Add gentle pulsing glow (much more subtle)
+                self.addGentlePulsingGlow(to: messageView)
+            }
         }
     }
-    
-    private func addPulsingGlow(to view: UIView) {
-        UIView.animate(withDuration: 1.5, delay: 0, options: [.repeat, .autoreverse], animations: {
+
+    private func addGentlePulsingGlow(to view: UIView) {
+        // Much more subtle pulsing than before
+        UIView.animate(withDuration: 2.0, delay: 0, options: [.repeat, .autoreverse, .allowUserInteraction], animations: {
             view.layer.shadowOpacity = 0.4
         })
     }
     
-     func hideCompletionMessage() {
+    func hideCompletionMessage() {
         UIView.animate(withDuration: 0.5, animations: {
             self.messageView?.alpha = 0
             self.messageView?.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
@@ -549,6 +616,7 @@ extension GameViewController {
             self.messageView?.isHidden = true
             self.messageView?.layer.removeAllAnimations()
             self.messageView?.layer.shadowOpacity = 0
+            self.messageView?.transform = .identity
         }
     }
 }
