@@ -92,6 +92,10 @@ class GameViewController: UIViewController {
         updateCellViews()
         updateUI()
         
+        if let magnetType = viewModel?.getCurrentMagnetType() {
+                print("GameViewController: Current magnet type is \(magnetType)")
+            }
+        
         if isLaunchedFromDashboard, let tutorialId = tutorialId, tutorialCoordinator == nil {
                 setupTutorial(tutorialId)
             }
@@ -354,15 +358,20 @@ class GameViewController: UIViewController {
         
         let availableMagnets = viewModel.getAvailableMagnets()
         let selectedType = viewModel.getSelectedMagnetType()
+        let magnetType = viewModel.getCurrentMagnetType()  // Get the current magnet type
+        
+        print("Updating magnet buttons with magnetType: \(magnetType)")
         
         positiveButton.configure(
             type: 1,
+            magnetType: magnetType,  // Pass the magnet type
             count: availableMagnets.positive,
             isSelected: selectedType == 1
         )
         
         negativeButton.configure(
             type: -1,
+            magnetType: magnetType,  // Pass the magnet type
             count: availableMagnets.negative,
             isSelected: selectedType == -1
         )

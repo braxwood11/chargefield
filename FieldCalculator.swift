@@ -53,12 +53,12 @@ class FieldCalculator {
         for row in 0..<gridSize {
             for col in 0..<gridSize {
                 let position = GridPosition(row: row, col: col)
-                influenceCache[position] = calculateInfluencePattern(for: position)
+                influenceCache[position] = calculateStandardInfluencePattern(for: position)
             }
         }
     }
     
-    private func calculateInfluencePattern(for source: GridPosition) -> [GridPosition: Int] {
+    private func calculateStandardInfluencePattern(for source: GridPosition) -> [GridPosition: Int] {
         var pattern: [GridPosition: Int] = [:]
         
         // Own cell gets strongest influence
@@ -89,6 +89,31 @@ class FieldCalculator {
         return pattern
     }
     
+    // Add new method for diagonal patterns
+    private func calculateDiagonalInfluencePattern(for source: GridPosition) -> [GridPosition: Int] {
+        var pattern: [GridPosition: Int] = [:]
+        
+        // Own cell gets strongest influence
+        pattern[source] = FieldStrength.ownCell
+        
+        // Diagonal directions: up-left, up-right, down-left, down-right
+        let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        
+        for direction in directions {
+            for distance in 1...FieldStrength.maxInfluenceDistance {
+                let targetRow = source.row + (direction.0 * distance)
+                let targetCol = source.col + (direction.1 * distance)
+                
+                if targetRow >= 0 && targetRow < gridSize && targetCol >= 0 && targetCol < gridSize {
+                    let target = GridPosition(row: targetRow, col: targetCol)
+                    pattern[target] = influenceStrength(for: distance)
+                }
+            }
+        }
+        
+        return pattern
+    }
+    
     private func influenceStrength(for distance: Int) -> Int {
         switch distance {
         case 0: return FieldStrength.ownCell
@@ -101,17 +126,24 @@ class FieldCalculator {
     // MARK: - Field Calculation Methods
     
     /// Calculate all field values from scratch (used for initialization)
-    func calculateAllFieldValues(initialCharges: [[Int]], magnets: [[Int]]) -> [[Int]] {
+    func calculateAllFieldValues(initialCharges: [[Int]], magnets: [[Int]], magnetType: MagnetType = .standard) -> [[Int]] {
         // Start with initial charges
         currentFieldValues = initialCharges.map { $0 }
         magnetPlacements = magnets.map { $0 }
         
-        // Add influence from each magnet
+        // Add influence from each magnet using the correct pattern
         for row in 0..<gridSize {
             for col in 0..<gridSize {
                 let magnetValue = magnets[row][col]
                 if magnetValue != 0 {
-                    applyMagnetInfluence(at: GridPosition(row: row, col: col), magnetType: magnetValue)
+                    let position = GridPosition(row: row, col: col)
+                    // Get the correct pattern for this magnet type
+                    let pattern = getInfluencePattern(for: position, magnetType: magnetType)
+                    
+                    // Apply the influence directly
+                    for (targetPosition, strength) in pattern {
+                        currentFieldValues[targetPosition.row][targetPosition.col] += strength * magnetValue
+                    }
                 }
             }
         }
@@ -120,10 +152,10 @@ class FieldCalculator {
     }
     
     /// Update field values when a magnet is placed or removed
-    func updateFieldValue(at position: GridPosition, oldMagnet: Int, newMagnet: Int, initialCharges: [[Int]]) -> [[Int]] {
+    func updateFieldValue(at position: GridPosition, oldMagnet: Int, newMagnet: Int, initialCharges: [[Int]], magnetType: MagnetType = .standard) -> [[Int]] {
         // Remove influence of old magnet
         if oldMagnet != 0 {
-            removeMagnetInfluence(at: position, magnetType: oldMagnet)
+            removeMagnetInfluence(at: position, magnetType: oldMagnet, magnetPattern: magnetType)
         }
         
         // Update magnet placement
@@ -131,22 +163,22 @@ class FieldCalculator {
         
         // Add influence of new magnet
         if newMagnet != 0 {
-            applyMagnetInfluence(at: position, magnetType: newMagnet)
+            applyMagnetInfluence(at: position, magnetType: newMagnet, magnetPattern: magnetType)
         }
         
         return currentFieldValues
     }
     
-    private func applyMagnetInfluence(at position: GridPosition, magnetType: Int) {
-        guard let pattern = influenceCache[position] else { return }
+    private func applyMagnetInfluence(at position: GridPosition, magnetType: Int, magnetPattern: MagnetType) {
+        let pattern = getInfluencePattern(for: position, magnetType: magnetPattern)
         
         for (targetPosition, strength) in pattern {
             currentFieldValues[targetPosition.row][targetPosition.col] += strength * magnetType
         }
     }
     
-    private func removeMagnetInfluence(at position: GridPosition, magnetType: Int) {
-        guard let pattern = influenceCache[position] else { return }
+    private func removeMagnetInfluence(at position: GridPosition, magnetType: Int, magnetPattern: MagnetType) {
+        let pattern = getInfluencePattern(for: position, magnetType: magnetPattern)
         
         for (targetPosition, strength) in pattern {
             currentFieldValues[targetPosition.row][targetPosition.col] -= strength * magnetType
@@ -156,8 +188,13 @@ class FieldCalculator {
     // MARK: - Query Methods
     
     /// Get the influence pattern for a position (for UI preview)
-    func getInfluencePattern(for position: GridPosition) -> [GridPosition: Int] {
-        return influenceCache[position] ?? [:]
+    func getInfluencePattern(for position: GridPosition, magnetType: MagnetType) -> [GridPosition: Int] {
+        switch magnetType {
+        case .standard:
+            return calculateStandardInfluencePattern(for: position)
+        case .diagonal:
+            return calculateDiagonalInfluencePattern(for: position)
+        }
     }
     
     /// Get all positions that would be affected by placing a magnet

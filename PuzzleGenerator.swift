@@ -68,7 +68,8 @@ class PuzzleGenerator {
         gridSize: Int = 5,
         difficulty: String = "medium",
         positiveMagnets: Int = 3,
-        negativeMagnets: Int = 3
+        negativeMagnets: Int = 3,
+        magnetType: MagnetType = .standard
     ) -> PuzzleDefinition {
         
         let config = DifficultyConfig.config(for: difficulty, gridSize: gridSize)
@@ -85,7 +86,8 @@ class PuzzleGenerator {
         let fieldValues = calculateFieldValues(
             solution: solution,
             gridSize: gridSize,
-            calculator: fieldCalculator
+            calculator: fieldCalculator,
+            magnetType: magnetType
         )
         
         // Step 3: Select target cells based on difficulty
@@ -109,7 +111,8 @@ class PuzzleGenerator {
             solution: solution,
             placeableGrid: placeableGrid,
             positiveMagnets: positiveMagnets,
-            negativeMagnets: negativeMagnets
+            negativeMagnets: negativeMagnets,
+            magnetType: magnetType
         )
     }
     
@@ -157,7 +160,8 @@ class PuzzleGenerator {
     private static func calculateFieldValues(
         solution: [[Int]],
         gridSize: Int,
-        calculator: FieldCalculator
+        calculator: FieldCalculator,
+        magnetType: MagnetType = .standard
     ) -> [[Int]] {
         
         // Initial charges are all zero for puzzle generation
@@ -167,9 +171,37 @@ class PuzzleGenerator {
         )
         
         return calculator.calculateAllFieldValues(
-            initialCharges: initialCharges,
-            magnets: solution
-        )
+                initialCharges: initialCharges,
+                magnets: solution,
+                magnetType: magnetType
+            )
+    }
+    
+    private static func calculateFieldValuesWithMagnetType(
+        initialCharges: [[Int]],
+        magnets: [[Int]],
+        calculator: FieldCalculator,
+        magnetType: MagnetType
+    ) -> [[Int]] {
+        
+        var fieldValues = initialCharges.map { $0 }
+        
+        // Apply each magnet's influence using the specified type
+        for row in 0..<magnets.count {
+            for col in 0..<magnets[row].count {
+                let magnetValue = magnets[row][col]
+                if magnetValue != 0 {
+                    let position = GridPosition(row: row, col: col)
+                    let pattern = calculator.getInfluencePattern(for: position, magnetType: magnetType)
+                    
+                    for (targetPosition, strength) in pattern {
+                        fieldValues[targetPosition.row][targetPosition.col] += strength * magnetValue
+                    }
+                }
+            }
+        }
+        
+        return fieldValues
     }
     
     // MARK: - Target Cell Selection

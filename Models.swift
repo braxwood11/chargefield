@@ -9,10 +9,31 @@ import Foundation
 
 // MARK: - Models
 
+enum MagnetType: String, CaseIterable, Codable {
+    case standard = "standard"    // Current + pattern (3,2,1)
+    case diagonal = "diagonal"    // X pattern (3,2,1 on diagonals)
+    
+    var displayName: String {
+        switch self {
+        case .standard: return "Field Stabilizer"
+        case .diagonal: return "Diagonal Resonator"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .standard: return "plus"
+        case .diagonal: return "xmark"
+        }
+    }
+}
+
 // Represents a cell on the grid
 struct MagnetCell {
     // -1 for negative, 0 for none, 1 for positive
     var toolEffect: Int = 0
+    // Define magnet type, initial is standard cross pattern
+    var magnetType: MagnetType = .standard
     // Initial charge to be neutralized (non-zero means this is a target cell)
     var initialCharge: Int = 0
     // Current calculated field value
@@ -98,6 +119,7 @@ struct PuzzleDefinition {
     let placeableGrid: [[Bool]]?
     let positiveMagnets: Int
     let negativeMagnets: Int
+    let magnetType: MagnetType
     
     // Static function to create the Z pattern puzzle from the original code
     static func zPatternPuzzle() -> PuzzleDefinition {
@@ -130,12 +152,13 @@ struct PuzzleDefinition {
             solution: solution,
             placeableGrid: placeableGrid,
             positiveMagnets: 3,
-            negativeMagnets: 3
+            negativeMagnets: 3,
+            magnetType: .standard
         )
     }
     
     // Generate a random puzzle
-    static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3) -> PuzzleDefinition {
+    static func generateRandomPuzzle(gridSize: Int = 5, difficulty: String = "medium", positiveMagnets: Int = 3, negativeMagnets: Int = 3, magnetType: MagnetType = .standard) -> PuzzleDefinition {
         return PuzzleGenerator.generateRandomPuzzle(
             gridSize: gridSize,
             difficulty: difficulty,
@@ -169,7 +192,8 @@ extension PuzzleDefinition {
             solution: solution,
             placeableGrid: nil,
             positiveMagnets: 1,
-            negativeMagnets: 1
+            negativeMagnets: 1,
+            magnetType: .standard
         )
     }
     
@@ -201,7 +225,8 @@ extension PuzzleDefinition {
             solution: solution,
             placeableGrid: nil,
             positiveMagnets: 1,
-            negativeMagnets: 1
+            negativeMagnets: 1,
+            magnetType: .standard
         )
     }
     
@@ -229,7 +254,8 @@ extension PuzzleDefinition {
             solution: solution,
             placeableGrid: nil,
             positiveMagnets: 1,
-            negativeMagnets: 1
+            negativeMagnets: 1,
+            magnetType: .standard
         )
     }
     
@@ -259,7 +285,8 @@ extension PuzzleDefinition {
             solution: solution,
             placeableGrid: nil,
             positiveMagnets: 2,
-            negativeMagnets: 2
+            negativeMagnets: 2,
+            magnetType: .standard
         )
     }
     
@@ -290,7 +317,8 @@ extension PuzzleDefinition {
             solution: solution,
             placeableGrid: nil,
             positiveMagnets: 2,
-            negativeMagnets: 1
+            negativeMagnets: 1,
+            magnetType: .standard
         )
     }
 }

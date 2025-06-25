@@ -1446,12 +1446,12 @@ class DashboardViewController: UIViewController {
                 isLocked: !progress.isTutorialCompleted("tutorial_basics")
             ),
             Assignment(
-                id: "advanced_assignment",
+                id: "diagonal_assignment",
                 title: "Assignment #2",
-                subtitle: "Advanced Field Operations",
-                icon: "lock.fill",
-                type: .campaign,
-                isLocked: !progress.isTutorialCompleted("tutorial_efficiency")
+                subtitle: "Diagonal Resonance Challenge",
+                icon: "x.circle",
+                type: .random,
+                isLocked: !progress.isTutorialCompleted("tutorial_basics")
             )
         ]
     }
@@ -1826,9 +1826,22 @@ class DashboardViewController: UIViewController {
                 gridSize: gridSize,
                 difficulty: randomDifficulty,
                 positiveMagnets: randomDifficulty == "easy" ? 2 : 3,
-                negativeMagnets: randomDifficulty == "easy" ? 2 : 3
+                negativeMagnets: randomDifficulty == "easy" ? 2 : 3,
+                magnetType: .standard
             )
             gameVC.setViewModel(GameViewModel(puzzle: randomPuzzle))
+        case "diagonal_assignment":
+            let gridSize = Bool.random() ? 4 : 5
+                    
+                    let diagonalPuzzle = PuzzleDefinition.generateRandomPuzzle(
+                        gridSize: gridSize,
+                        difficulty: "medium",
+                        positiveMagnets: 3,
+                        negativeMagnets: 3,
+                        magnetType: .diagonal
+                    )
+            print("DEBUG: Created puzzle with magnetType: \(diagonalPuzzle.magnetType)")
+                    gameVC.setViewModel(GameViewModel(puzzle: diagonalPuzzle))
         default:
             return
         }

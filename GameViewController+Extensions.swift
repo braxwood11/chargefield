@@ -699,7 +699,8 @@ extension GameViewController {
     
     func updateCellView(_ cellView: CellView, with cell: MagnetCell) {
         cellView.cell = cell
-        cellView.showHints = viewModel?.areHintsEnabled() ?? false
-        cellView.selectedMagnetType = viewModel?.getSelectedMagnetType() ?? 1
+            cellView.magnetType = viewModel?.getCurrentMagnetType() ?? .standard  // Add this line
+            cellView.showHints = viewModel?.areHintsEnabled() ?? false
+            cellView.selectedMagnetType = viewModel?.getSelectedMagnetType() ?? 1
     }
 }

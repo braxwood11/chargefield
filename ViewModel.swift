@@ -22,6 +22,7 @@ class GameViewModel {
     private let fieldCalculator: FieldCalculator
     private let totalPositiveMagnets: Int
     private let totalNegativeMagnets: Int
+    private let puzzleMagnetType: MagnetType
     
     weak var delegate: GameStateDelegate?
 
@@ -57,6 +58,9 @@ class GameViewModel {
         self.gridSize = puzzle.gridSize
         self.totalPositiveMagnets = puzzle.positiveMagnets
         self.totalNegativeMagnets = puzzle.negativeMagnets
+        self.puzzleMagnetType = puzzle.magnetType
+        
+        print("DEBUG: GameViewModel initialized with magnetType: \(self.puzzleMagnetType)")
         
         // Initialize field calculator
         self.fieldCalculator = FieldCalculatorFactory.getCalculator(for: puzzle.gridSize)
@@ -92,7 +96,8 @@ class GameViewModel {
         // Calculate field values using the optimized calculator
         let fieldValues = fieldCalculator.calculateAllFieldValues(
             initialCharges: initialCharges,
-            magnets: magnets
+            magnets: magnets,
+            magnetType: puzzleMagnetType
         )
         
         // Update grid with calculated values
@@ -215,6 +220,10 @@ class GameViewModel {
         }
     }
     
+    func getCurrentMagnetType() -> MagnetType {
+            return puzzleMagnetType
+        }
+    
     private func updateFieldValueForMagnetChange(at position: GridPosition, oldMagnet: Int, newMagnet: Int) {
         // Extract initial charges
         var initialCharges: [[Int]] = []
@@ -222,12 +231,13 @@ class GameViewModel {
             initialCharges.append(row.map { $0.initialCharge })
         }
         
-        // Use optimized field calculator
+        // Use optimized field calculator with the correct magnet type
         let fieldValues = fieldCalculator.updateFieldValue(
             at: position,
             oldMagnet: oldMagnet,
             newMagnet: newMagnet,
-            initialCharges: initialCharges
+            initialCharges: initialCharges,
+            magnetType: puzzleMagnetType  // Add this parameter
         )
         
         // Update grid
@@ -300,25 +310,27 @@ class GameViewModel {
     
     // MARK: - Influence Calculation
     func getInfluenceArea(for row: Int, col: Int) -> [[Bool]] {
-        let position = GridPosition(row: row, col: col)
-        let affectedPositions = fieldCalculator.getAffectedPositions(for: position)
-        
-        var influence = Array(repeating: Array(repeating: false, count: gridSize), count: gridSize)
-        
-        for pos in affectedPositions {
-            influence[pos.row][pos.col] = true
+            let position = GridPosition(row: row, col: col)
+            let affectedPositions = fieldCalculator.getInfluencePattern(for: position, magnetType: puzzleMagnetType)
+            
+            var influence = Array(repeating: Array(repeating: false, count: gridSize), count: gridSize)
+            
+            for (pos, _) in affectedPositions {
+                if pos.row >= 0 && pos.row < gridSize && pos.col >= 0 && pos.col < gridSize {
+                    influence[pos.row][pos.col] = true
+                }
+            }
+            
+            return influence
         }
-        
-        return influence
-    }
     
     func getInfluenceIntensity(from sourceRow: Int, sourceCol: Int, to targetRow: Int, targetCol: Int) -> Int {
-        let source = GridPosition(row: sourceRow, col: sourceCol)
-        let target = GridPosition(row: targetRow, col: targetCol)
-        let pattern = fieldCalculator.getInfluencePattern(for: source)
-        
-        return pattern[target] ?? 0
-    }
+            let source = GridPosition(row: sourceRow, col: sourceCol)
+            let target = GridPosition(row: targetRow, col: targetCol)
+            let pattern = fieldCalculator.getInfluencePattern(for: source, magnetType: puzzleMagnetType)
+            
+            return pattern[target] ?? 0
+        }
     
     func getInfluenceValue(at row: Int, col: Int, magnetType: Int) -> Int {
         return getInfluenceValue(from: row, sourceCol: col, to: row, targetCol: col, magnetType: magnetType)

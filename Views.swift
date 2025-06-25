@@ -18,6 +18,7 @@ class CellView: UIView {
     private let magnetSymbol = UILabel()
     private let neutralizedIndicator = UIView()
     var previewValue: Int? = nil
+    var magnetType: MagnetType = .standard
     
     // Progress indicator component
     private let fillBarView = UIView()
@@ -171,21 +172,19 @@ class CellView: UIView {
         
         // Show magnet if present with much brighter colors
         if cell.toolEffect != 0 {
-            magnetView.isHidden = false
-            if cell.toolEffect > 0 {
-                magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0)
-                magnetSymbol.text = "+"
-            } else {
-                magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
-                magnetSymbol.text = "-"
-            }
-            
-            // CRITICAL: Ensure magnet is always circular
-            ensureMagnetIsCircular()
-            
-        } else {
-            magnetView.isHidden = true
-        }
+                    magnetView.isHidden = false
+                    if cell.toolEffect > 0 {
+                        magnetView.backgroundColor = UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1.0)
+                        magnetSymbol.text = getSymbolForMagnetType(magnetType, positive: true)
+                    } else {
+                        magnetView.backgroundColor = UIColor(red: 0.0, green: 0.4, blue: 1.0, alpha: 1.0)
+                        magnetSymbol.text = getSymbolForMagnetType(magnetType, positive: false)
+                    }
+                    
+                    ensureMagnetIsCircular()
+                } else {
+                    magnetView.isHidden = true
+                }
         
         // Update neutralization status
         updateNeutralizationStatus()
@@ -193,6 +192,15 @@ class CellView: UIView {
         // Show selection overlay if selected
         updateSelectionAppearance()
     }
+    
+    private func getSymbolForMagnetType(_ magnetType: MagnetType, positive: Bool) -> String {
+            switch magnetType {
+            case .standard:
+                return positive ? "+" : "−"
+            case .diagonal:
+                return positive ? "✚" : "✖"
+            }
+        }
     
     private func ensureMagnetIsCircular() {
         // Reset any leftover transforms that might cause issues
@@ -996,6 +1004,7 @@ class MessageView: UIView {
 class MagnetButton: UIButton {
     // Properties
     var toolType: Int = 0
+    var magnetType: MagnetType = .standard
     var count: Int?
     
     // UI elements
@@ -1045,24 +1054,25 @@ class MagnetButton: UIButton {
     }
     
     // Configure the button for a specific magnet type
-    func configure(type: Int, count: Int? = nil, isSelected: Bool) {
+    func configure(type: Int, magnetType: MagnetType, count: Int? = nil, isSelected: Bool) {
         self.toolType = type
+        self.magnetType = magnetType
         self.count = count
         
         // Set background and text colors to match terminal theme
             backgroundColor = .black
         
-        // Set symbol
-        if type == 1 {
-                symbolLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Bright red
-                symbolLabel.text = "+"
-            } else if type == -1 {
-                symbolLabel.textColor = UIColor(red: 0.1, green: 0.6, blue: 1.0, alpha: 1.0) // Bright blue
-                symbolLabel.text = "−"  // Using unicode minus sign for better appearance
-            } else {
-                symbolLabel.textColor = .lightGray
-                symbolLabel.text = "✕"  // Using unicode multiplication sign for X
-            }
+        // Set symbol based on magnet type and polarity
+                if type == 1 {
+                    symbolLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Bright red
+                    symbolLabel.text = getSymbolForMagnetType(magnetType, positive: true)
+                } else if type == -1 {
+                    symbolLabel.textColor = UIColor(red: 0.1, green: 0.6, blue: 1.0, alpha: 1.0) // Bright blue
+                    symbolLabel.text = getSymbolForMagnetType(magnetType, positive: false)
+                } else {
+                    symbolLabel.textColor = .lightGray
+                    symbolLabel.text = "✕"
+                }
         
         // Set count text if available
         if let count = count {
@@ -1089,6 +1099,16 @@ class MagnetButton: UIButton {
                 layer.borderWidth = 2
                 layer.borderColor = UIColor.green.withAlphaComponent(0.4).cgColor
                 layer.shadowOpacity = 0
+            }
+        }
+    
+    // Add helper method to get the right symbol
+        private func getSymbolForMagnetType(_ magnetType: MagnetType, positive: Bool) -> String {
+            switch magnetType {
+            case .standard:
+                    return positive ? "+" : "−"
+                case .diagonal:
+                    return positive ? "⬈" : "⬋"  // Use more obvious diagonal arrows
             }
         }
 }
