@@ -120,6 +120,7 @@ class DashboardViewController: UIViewController {
     private var floatingCommandView: UIView?
     private var isCommandFloating = false
     private var directoryContentsBottomConstraint: NSLayoutConstraint?
+    private var dashboardTutorialStep = 0
     
     // MARK: - UI Elements
     private let titleView = UIView()
@@ -130,34 +131,52 @@ class DashboardViewController: UIViewController {
     private let commandTextField = UITextField()
     private let messagesButton = UIButton()
     private var messagesBadgeLabel: UILabel?
+    private var scrollViewBottomConstraint: NSLayoutConstraint?
+    private var onboardingOverlay: UIView?
     
     // Terminal elements
     private let currentPathLabel = TerminalLabel()
     private let directoryContentsLabel = TerminalLabel()
     
+
+    private var isFirstLaunch: Bool {
+            return !UserDefaults.standard.bool(forKey: "hasCompletedDashboardTutorial")
+        }
+        
+    private var shouldShowTerminal: Bool {
+            return GameProgressManager.shared.isTutorialCompleted("tutorial_basics") &&
+                   GameProgressManager.shared.isTutorialCompleted("tutorial_advanced")
+        }
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
-        super.viewDidLoad()
-        
-        title = "Employee Dashboard"
-        setupUI()
-        updateCurrentDirectory()
-        
-        // Listen for message updates
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(updateMessagesBadge),
-            name: .newMessageReceived,
-            object: nil
-        )
-    }
+            super.viewDidLoad()
+            
+            title = "Employee Dashboard"
+            setupUI()
+            updateCurrentDirectory()
+            
+            // Add onboarding check
+            setupOnboardingIfNeeded()
+            
+            // Listen for message updates
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(updateMessagesBadge),
+                name: .newMessageReceived,
+                object: nil
+            )
+        }
     
     override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        navigationController?.setNavigationBarHidden(true, animated: animated)
-        updateCurrentDirectory()
-        updateMessagesBadge()
-    }
+            super.viewWillAppear(animated)
+            navigationController?.setNavigationBarHidden(true, animated: animated)
+            updateCurrentDirectory()
+            updateMessagesBadge()
+            
+            // Check if terminal should be unlocked
+            checkTerminalUnlock()
+        }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
@@ -327,6 +346,10 @@ class DashboardViewController: UIViewController {
         commandInputView.layer.shadowRadius = 8
         commandInputView.layer.shadowOpacity = 0.3
         
+        // Store the bottom constraint reference for dynamic hiding/showing
+        scrollViewBottomConstraint = scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -120)
+        scrollViewBottomConstraint?.isActive = true
+        
         view.addSubview(commandInputView)
         
         // Make the entire view a button
@@ -486,6 +509,310 @@ class DashboardViewController: UIViewController {
         
         updateMessagesBadge()
     }
+    
+    private func setupOnboardingIfNeeded() {
+        // Always start with clean state
+        forceRemoveAnyOnboardingOverlays()
+        
+        if isFirstLaunch {
+            hideTerminalInterface()
+            // START IN TRAINING DIRECTORY - CHANGED THIS LINE
+            navigateToDirectory(.training)
+            
+            // Small delay to let the UI settle, then start onboarding
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                self.startDashboardOnboarding()
+            }
+        } else if shouldShowTerminal {
+            showTerminalInterface()
+        } else {
+            hideTerminalInterface()
+        }
+    }
+        
+        private func hideTerminalInterface() {
+            commandInputView.isHidden = true
+            
+            // Update constraint
+            scrollViewBottomConstraint?.constant = -20
+            view.layoutIfNeeded()
+        }
+        
+        private func showTerminalInterface() {
+            // Update constraint first
+            scrollViewBottomConstraint?.constant = -120
+            
+            commandInputView.isHidden = false
+            commandInputView.alpha = 0
+            commandInputView.transform = CGAffineTransform(translationX: 0, y: 50)
+            
+            UIView.animate(withDuration: 0.8, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3) {
+                self.view.layoutIfNeeded()
+            }
+            
+            UIView.animate(withDuration: 0.6, delay: 0.2, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
+                self.commandInputView.alpha = 1
+                self.commandInputView.transform = .identity
+            }
+        }
+        
+        private func checkTerminalUnlock() {
+            if !isFirstLaunch && shouldShowTerminal && commandInputView.isHidden {
+                showTerminalUnlockNotification()
+            }
+        }
+        
+        private func showTerminalUnlockNotification() {
+            let alert = UIAlertController(
+                title: "System Access Upgraded",
+                message: "Your training progress has unlocked additional system features. You now have access to the employee terminal.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Continue", style: .default) { [weak self] _ in
+                self?.showTerminalInterface()
+            })
+            
+            present(alert, animated: true)
+        }
+    
+        
+        // MARK: - Onboarding Flow
+        private func startDashboardOnboarding() {
+            showSystemWelcomeDialog { [weak self] in
+                self?.highlightMessagesButton { [weak self] in
+                    self?.highlightTrainingDirectory { [weak self] in
+                        self?.completeOnboarding()
+                    }
+                }
+            }
+        }
+        
+        private func showSystemWelcomeDialog(completion: @escaping () -> Void) {
+            let dialogVC = DialogViewController()
+            dialogVC.assignmentId = "system_welcome"
+            dialogVC.completion = completion
+            present(dialogVC, animated: true)
+        }
+        
+        private func highlightMessagesButton(completion: @escaping () -> Void) {
+            showOnboardingOverlay(
+                highlightView: messagesButton,
+                title: "Company Communications",
+                message: "Check your messages for important company information and updates.",
+                actionText: "Tap the message icon when ready"
+            ) { [weak self] in
+                self?.dismissOnboardingOverlay()
+                // Add delay to let user see the messages area before next step
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    completion()
+                }
+            }
+        }
+        
+    private func highlightTrainingDirectory(completion: @escaping () -> Void) {
+        // We're already in training directory, just wait for content to be ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Try to find the first training assignment button to highlight
+            let firstTrainingButton = self.assignmentButtons.first
+            
+            self.showOnboardingOverlay(
+                highlightView: firstTrainingButton,
+                title: "Mandatory Training",
+                message: "Complete your required training programs to access additional company resources.",
+                actionText: "Ready to begin your training"
+            ) { [weak self] in
+                self?.dismissOnboardingOverlay()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    completion()
+                }
+            }
+        }
+    }
+        
+        private func completeOnboarding() {
+            // Force remove any lingering overlays first
+            forceRemoveAnyOnboardingOverlays()
+            
+            // Mark as completed
+            UserDefaults.standard.set(true, forKey: "hasCompletedDashboardTutorial")
+            
+            // Small delay to ensure UI is clean before showing completion dialog
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                let alert = UIAlertController(
+                    title: "System Setup Complete",
+                    message: "Your employee dashboard is now configured. Additional features will be unlocked as you complete training programs.",
+                    preferredStyle: .alert
+                )
+                
+                alert.addAction(UIAlertAction(title: "Begin Work", style: .default) { _ in
+                    // Completion action - maybe trigger a subtle UI update or animation
+                    print("Onboarding completed successfully")
+                })
+                
+                self.present(alert, animated: true)
+            }
+        }
+        
+        // MARK: - Onboarding Overlay (with proper highlighting)
+        private func showOnboardingOverlay(highlightView: UIView?, title: String, message: String, actionText: String, completion: @escaping () -> Void) {
+            // Remove any existing overlay first
+            forceRemoveAnyOnboardingOverlays()
+            
+            // Small delay to ensure clean state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // Create overlay
+                self.onboardingOverlay = UIView(frame: self.view.bounds)
+                guard let overlay = self.onboardingOverlay else { return }
+                
+                overlay.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+                self.view.addSubview(overlay)
+                
+                // Add highlighting if view is provided
+                if let highlightView = highlightView {
+                    self.createHighlightHole(for: highlightView, in: overlay)
+                }
+                
+                // Create instruction container
+                let instructionContainer = TerminalContainerView()
+                instructionContainer.translatesAutoresizingMaskIntoConstraints = false
+                overlay.addSubview(instructionContainer)
+                
+                // Add labels and button
+                let titleLabel = TerminalLabel()
+                titleLabel.style = .heading
+                titleLabel.text = title
+                titleLabel.numberOfLines = 0
+                titleLabel.textAlignment = .center
+                titleLabel.translatesAutoresizingMaskIntoConstraints = false
+                instructionContainer.addSubview(titleLabel)
+                
+                let messageLabel = TerminalLabel()
+                messageLabel.style = .body
+                messageLabel.text = message
+                messageLabel.numberOfLines = 0
+                messageLabel.textAlignment = .center
+                messageLabel.translatesAutoresizingMaskIntoConstraints = false
+                instructionContainer.addSubview(messageLabel)
+                
+                let continueButton = TerminalButton()
+                continueButton.style = .primary
+                continueButton.setTitle("CONTINUE", for: .normal)
+                continueButton.translatesAutoresizingMaskIntoConstraints = false
+                instructionContainer.addSubview(continueButton)
+                
+                // Store completion in a way we can access it
+                continueButton.addAction(UIAction { _ in completion() }, for: .touchUpInside)
+                
+                let isHighlightingMessagesButton = (highlightView === self.messagesButton)
+
+                if isHighlightingMessagesButton {
+                    // Messages button is at bottom, so put instructions at top
+                    NSLayoutConstraint.activate([
+                        instructionContainer.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 30),
+                                instructionContainer.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -30),
+                                instructionContainer.topAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.topAnchor, constant: 100),
+                    
+                    titleLabel.topAnchor.constraint(equalTo: instructionContainer.topAnchor, constant: 20),
+                    titleLabel.leadingAnchor.constraint(equalTo: instructionContainer.leadingAnchor, constant: 20),
+                    titleLabel.trailingAnchor.constraint(equalTo: instructionContainer.trailingAnchor, constant: -20),
+                    
+                    messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 15),
+                    messageLabel.leadingAnchor.constraint(equalTo: instructionContainer.leadingAnchor, constant: 20),
+                    messageLabel.trailingAnchor.constraint(equalTo: instructionContainer.trailingAnchor, constant: -20),
+                    
+                    continueButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 20),
+                    continueButton.centerXAnchor.constraint(equalTo: instructionContainer.centerXAnchor),
+                    continueButton.widthAnchor.constraint(equalToConstant: 120),
+                    continueButton.heightAnchor.constraint(equalToConstant: 44),
+                    continueButton.bottomAnchor.constraint(equalTo: instructionContainer.bottomAnchor, constant: -20)
+                ])
+                } else {
+                    // Training buttons are in middle, so put instructions at bottom
+                    NSLayoutConstraint.activate([
+                        instructionContainer.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 30),
+                        instructionContainer.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -30),
+                        instructionContainer.bottomAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+                        
+                        titleLabel.topAnchor.constraint(equalTo: instructionContainer.topAnchor, constant: 20),
+                        titleLabel.leadingAnchor.constraint(equalTo: instructionContainer.leadingAnchor, constant: 20),
+                        titleLabel.trailingAnchor.constraint(equalTo: instructionContainer.trailingAnchor, constant: -20),
+                        
+                        messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 15),
+                        messageLabel.leadingAnchor.constraint(equalTo: instructionContainer.leadingAnchor, constant: 20),
+                        messageLabel.trailingAnchor.constraint(equalTo: instructionContainer.trailingAnchor, constant: -20),
+                        
+                        continueButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 20),
+                        continueButton.centerXAnchor.constraint(equalTo: instructionContainer.centerXAnchor),
+                        continueButton.widthAnchor.constraint(equalToConstant: 120),
+                        continueButton.heightAnchor.constraint(equalToConstant: 44),
+                        continueButton.bottomAnchor.constraint(equalTo: instructionContainer.bottomAnchor, constant: -20)
+                    ])
+                }
+                // Animate in
+                overlay.alpha = 0
+                UIView.animate(withDuration: 0.3) {
+                    overlay.alpha = 1
+                }
+            }
+        }
+        
+        // MARK: - Highlighting Helper
+        private func createHighlightHole(for targetView: UIView, in overlay: UIView) {
+            // Convert target view frame to overlay coordinates
+            guard let targetSuperview = targetView.superview else { return }
+            let frameInOverlay = overlay.convert(targetView.frame, from: targetSuperview)
+            
+            // Create hole in overlay to show the target view
+            let path = UIBezierPath(rect: overlay.bounds)
+            let highlightPath = UIBezierPath(roundedRect: frameInOverlay.insetBy(dx: -8, dy: -8), cornerRadius: 8)
+            path.append(highlightPath)
+            
+            let maskLayer = CAShapeLayer()
+            maskLayer.fillRule = .evenOdd
+            maskLayer.path = path.cgPath
+            overlay.layer.mask = maskLayer
+            
+            // Create highlight border around the hole
+            let highlightBorder = CAShapeLayer()
+            highlightBorder.path = highlightPath.cgPath
+            highlightBorder.fillColor = UIColor.clear.cgColor
+            highlightBorder.strokeColor = TerminalTheme.Colors.primaryGreen.cgColor
+            highlightBorder.lineWidth = 3
+            
+            // Add pulsing animation to draw attention
+            let pulseAnimation = CABasicAnimation(keyPath: "opacity")
+            pulseAnimation.fromValue = 1.0
+            pulseAnimation.toValue = 0.5
+            pulseAnimation.duration = 1.0
+            pulseAnimation.autoreverses = true
+            pulseAnimation.repeatCount = .infinity
+            highlightBorder.add(pulseAnimation, forKey: "pulse")
+            
+            overlay.layer.addSublayer(highlightBorder)
+        }
+        
+        private func dismissOnboardingOverlay() {
+            guard let overlay = onboardingOverlay else { return }
+            
+            UIView.animate(withDuration: 0.3, animations: {
+                overlay.alpha = 0
+            }) { _ in
+                overlay.removeFromSuperview()
+                self.onboardingOverlay = nil
+            }
+        }
+        
+        // Add this method to ensure clean overlay removal
+        private func forceRemoveAnyOnboardingOverlays() {
+            // Remove any lingering onboarding overlays
+            view.subviews.forEach { subview in
+                if subview.backgroundColor == UIColor.black.withAlphaComponent(0.8) {
+                    subview.removeFromSuperview()
+                }
+            }
+            onboardingOverlay = nil
+        }
     
     // MARK: - Floating Command Interface
     private func createFloatingCommandInterface() {
@@ -1067,7 +1394,7 @@ class DashboardViewController: UIViewController {
         return [
             Assignment(
                 id: "tutorial_basics",
-                title: "NeutraTech Orientation #1",
+                title: "Orientation #1",
                 subtitle: "Required for Field Operations",
                 icon: "graduationcap.fill",
                 type: .tutorial,
@@ -1075,7 +1402,7 @@ class DashboardViewController: UIViewController {
             ),
             Assignment(
                 id: "tutorial_advanced",
-                title: "NeutraTech Orientation #2",
+                title: "Orientation #2",
                 subtitle: "Advanced Field Harmonization",
                 icon: "atom",
                 type: .tutorial,
@@ -1083,7 +1410,7 @@ class DashboardViewController: UIViewController {
             ),
             Assignment(
                 id: "tutorial_correction",
-                title: "NeutraTech Orientation #3",
+                title: "Orientation #3",
                 subtitle: "Precision Correction Protocols",
                 icon: "target",
                 type: .tutorial,
@@ -1091,11 +1418,19 @@ class DashboardViewController: UIViewController {
             ),
             Assignment(
                 id: "tutorial_efficiency",
-                title: "NeutraTech Orientation #4",
+                title: "Orientation #4",
                 subtitle: "Resource Management Training",
                 icon: "gearshape.fill",
                 type: .tutorial,
                 isLocked: !progress.isTutorialCompleted("tutorial_correction")
+            ),
+            Assignment(
+                id: "tutorial_patterns",
+                title: "Orientation #5",
+                subtitle: "Field Pattern Identification",
+                icon: "align.vertical.center.fill",
+                type: .tutorial,
+                isLocked: !progress.isTutorialCompleted("tutorial_efficiency")
             )
         ]
     }
@@ -1478,6 +1813,9 @@ class DashboardViewController: UIViewController {
             gameVC.tutorialId = assignmentId
         case "tutorial_efficiency":
             gameVC.setViewModel(GameViewModel(puzzle: .resourceManagementPuzzle()))
+            gameVC.tutorialId = assignmentId
+        case "tutorial_patterns":
+            gameVC.setViewModel(GameViewModel(puzzle: .patternsIdentificationPuzzle()))
             gameVC.tutorialId = assignmentId
         case "random_puzzle":
             let difficulties = ["easy", "medium", "hard"]

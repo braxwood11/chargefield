@@ -211,15 +211,15 @@ extension PuzzleDefinition {
         
         // Plus-sign pattern that encourages overshoot learning
         let targetValues = [
-            [0, -1, 0],
-            [-1, 0, -1],
-            [0, -1, 0]
+            [-3, -1, 0],
+            [-2, 0, 0],
+            [1, 0, 0]
         ]
         
         // Solution requires strategic thinking about overshoot
         let solution = [
+            [1, 0, 0],
             [0, 0, 0],
-            [0, 1, 0],
             [0, -1, 0]
         ]
         
@@ -238,19 +238,18 @@ extension PuzzleDefinition {
         let gridSize = 5
         
         let targetValues = [
-            [3, 0, 0, 0, -2],
-            [0, 0, -3, 0, 0],
-            [0, 2, 0, -1, 0],
-            [0, 0, 4, 0, 0],
-            [-2, 0, 0, 0, 1]
+            [-3, 0, 0, 0, 0],
+            [0, 4, 0, 0, 0],
+            [-2, 2, -3, 0, 0],
+            [2, 4, 0, 0, 0],
+            [0, 2, -1, 0, 0]
         ]
         
-        // Efficient solution using minimal tools
         let solution = [
-            [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-            [0, 0, -1, 0, 0],
-            [0, 0, -1, 0, 0],
+            [1, 0, 0, 0, 0],
+            [0, -1, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [0, -1, 0, 0, 0],
             [0, 0, 0, 0, 0]
         ]
         
@@ -261,6 +260,37 @@ extension PuzzleDefinition {
             placeableGrid: nil,
             positiveMagnets: 2,
             negativeMagnets: 2
+        )
+    }
+    
+    // Tutorial Level 5: Resource Management
+    static func patternsIdentificationPuzzle() -> PuzzleDefinition {
+        let gridSize = 5
+        
+        let targetValues = [
+            [-3, 0, -1, -2, 0],
+            [0, 0, -2, 0, -2],
+            [-1, 0, 0, -2, 0],
+            [0, 0, 0, 0, 0],
+            [0, 3, 2, 1, 0]
+        ]
+        
+        // Efficient solution using minimal tools
+        let solution = [
+            [1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, -1, 0, 0, 0]
+        ]
+        
+        return PuzzleDefinition(
+            gridSize: gridSize,
+            initialCharges: targetValues,
+            solution: solution,
+            placeableGrid: nil,
+            positiveMagnets: 2,
+            negativeMagnets: 1
         )
     }
 }

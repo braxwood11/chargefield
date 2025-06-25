@@ -147,7 +147,7 @@ struct BasicTutorial: TutorialLevel {
     let completionMessage = "Great job! You've completed your training."
 }
 
-// MARK: - Advanced Tutorial: Overlapping Fields
+// MARK: - Advanced Tutorial: Extended Harmonization Range
 struct AdvancedTutorial: TutorialLevel {
     let levelId = "tutorial_advanced"
     let title = "NeutraTech Orientation #2"
@@ -160,18 +160,23 @@ struct AdvancedTutorial: TutorialLevel {
     let steps: [TutorialStep] = [
         TutorialStep(
             id: "welcome_back",
-            instruction: "Great work on your first assignment! Now let's learn about overlapping field interactions.",
+            instruction: "Great work on your first assignment! Now let's learn about extended harmonization range.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "explain_mechanic",
+            instruction: "Your harmonization tools can influence multiple cells in a single placement, but the effect of the harmonization drops off on further cells.",
             requiresAction: false
         ),
         TutorialStep(
             id: "explain_challenge",
-            instruction: "Notice the targets in different areas. We'll solve them in two steps using overlapping field effects.",
+            instruction: "In this training, notice the targets in different areas. We can harmonize 4 fields in two steps due to the extended harmonization range.",
             requiresAction: false,
             highlightTargets: [.cell(row: 0, col: 1), .cell(row: 3, col: 1), .cell(row: 2, col: 3), .cell(row: 3, col: 3)]
         ),
         TutorialStep(
             id: "first_placement",
-            instruction: "First, place a stabilizer at position (1,1) to affect the negative targets on the left.",
+            instruction: "First, place a stabilizer at the highlighted position to affect the negative targets on the left.",
             requiresAction: true,
             highlightTargets: [.cell(row: 1, col: 1)],
             validation: .magnetPlaced(row: 1, col: 1, type: 1)
@@ -193,18 +198,12 @@ struct AdvancedTutorial: TutorialLevel {
             id: "second_challenge",
             instruction: "Perfect! Now place the suppressor to neutralize the positive targets on the right.",
             requiresAction: true,
-            highlightTargets: [.cell(row: 2, col: 3)],
-            validation: .magnetPlaced(row: 2, col: 3, type: -1)
+            validation: .puzzleSolved
         ),
-        TutorialStep(
-            id: "complete_advanced",
-            instruction: "Perfect! You've mastered overlapping field effects. Two harmonization tools solved four problems!",
-            requiresAction: false
-        )
     ]
     
     let nextTutorialId: String? = "tutorial_correction"
-    let completionMessage = "Excellent! You've mastered overlapping field effects."
+    let completionMessage = "Excellent! You've mastered extended harmonization range."
 }
 
 // MARK: - Correction Protocols Tutorial
@@ -225,33 +224,22 @@ struct CorrectionTutorial: TutorialLevel {
         ),
         TutorialStep(
             id: "show_pattern",
-            instruction: "Notice the plus-sign pattern of negative targets. They're all interconnected.",
+            instruction: "Notice the pattern of targets on the grid. You'll need to harmonize multiple cells at different charges when you place your tools.",
             requiresAction: false,
-            highlightTargets: [.cell(row: 0, col: 1), .cell(row: 1, col: 0), .cell(row: 1, col: 2), .cell(row: 2, col: 1)]
+            highlightTargets: [.cell(row: 0, col: 0), .cell(row: 1, col: 0), .cell(row: 2, col: 0), .cell(row: 0, col: 1)]
         ),
         TutorialStep(
             id: "demonstrate_overshoot",
-            instruction: "Place a stabilizer at the center (1,1). Watch what happens to the field values.",
+            instruction: "Place a stabilizer in the top corner. Watch what happens to the field values.",
             requiresAction: true,
-            highlightTargets: [.cell(row: 1, col: 1)],
-            validation: .magnetPlaced(row: 1, col: 1, type: 1)
+            highlightTargets: [.cell(row: 0, col: 0)],
+            validation: .magnetPlaced(row: 0, col: 0, type: 1)
         ),
         TutorialStep(
             id: "explain_overshoot_indicators",
             instruction: "See the orange stripes? That means you've overcorrected - the value went past zero.",
-            requiresAction: false
-        ),
-        TutorialStep(
-            id: "teach_recognition",
-            instruction: "Overshoot cells show warning patterns. The arrow indicates which harmonization tool type you need.",
-            requiresAction: false
-        ),
-        TutorialStep(
-            id: "demonstrate_recovery",
-            instruction: "Use a suppressor to pull the overshoot values back toward zero.",
-            requiresAction: true,
-            highlightTargets: [.suppressorButton],
-            validation: .magnetSelected(type: -1)
+            requiresAction: false,
+            highlightTargets: [.cell(row: 0, col: 1), .cell(row: 2, col: 0)]
         ),
         TutorialStep(
             id: "strategic_thinking",
@@ -283,40 +271,42 @@ struct EfficiencyTutorial: TutorialLevel {
     let steps: [TutorialStep] = [
         TutorialStep(
             id: "resource_constraints",
-            instruction: "This assignment has limited harmonization tools. You must use your equipment efficiently.",
+            instruction: "Sometimes in the field, you're stuck with a mess of jumbled targets and no idea where to start.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "have_a_plan",
+            instruction: "It's crucial to always have a plan. You can't just go throwing harmonization tools everywhere - that's a recipe for disaster.",
             requiresAction: false
         ),
         TutorialStep(
             id: "analyze_problem",
-            instruction: "Count the targets: some positive, some negative. You have only 4 harmonization tools total.",
+            instruction: "Look at this containment chamber. The charged cells may be bunched together, but if you look closely, there's a hint for where to start.",
             requiresAction: false,
             highlightTargets: [.grid]
         ),
         TutorialStep(
             id: "identify_key_positions",
-            instruction: "Look for placement spots where your tools can influence multiple targets simultaneously.",
+            instruction: "Scan the chamber for any outliers. It's easy to get tunnel vision trying to solve the big problem first, but a savvy field specialist starts with certainty and builds from there.",
             requiresAction: false
         ),
         TutorialStep(
             id: "demonstrate_efficiency",
-            instruction: "Place a suppressor at (2,2) - see how it affects three different target cells?",
+            instruction: "This cell has a charge of -3 and is positioned away from the other cells. That means we must use one of our stabilizers directly in that cell to neutralize it. Place one there now.",
+            requiresAction: true,
+            highlightTargets: [.cell(row: 0, col: 0)],
+            validation: .magnetPlaced(row: 0, col: 0, type: 1)
+        ),
+        TutorialStep(
+            id: "demonstrate_efficiency_2",
+            instruction: "Now we only have 1 stabilizer left. There's another field with a -3 charge which means we must place our last stabilizer there",
             requiresAction: true,
             highlightTargets: [.cell(row: 2, col: 2)],
-            validation: .magnetPlaced(row: 2, col: 2, type: -1)
-        ),
-        TutorialStep(
-            id: "calculate_requirements",
-            instruction: "Each target needs specific correction. Plan your harmonization tool deployment before placing.",
-            requiresAction: false
-        ),
-        TutorialStep(
-            id: "show_multi_target",
-            instruction: "One well-placed harmonization tool can solve multiple problems.",
-            requiresAction: false
+            validation: .magnetPlaced(row: 2, col: 2, type: 1)
         ),
         TutorialStep(
             id: "resource_tracking",
-            instruction: "Monitor your remaining tools. Each placement must count.",
+            instruction: "Monitor your remaining tools. Each placement is crucial.",
             requiresAction: false
         ),
         TutorialStep(
@@ -327,8 +317,65 @@ struct EfficiencyTutorial: TutorialLevel {
         )
     ]
     
-    let nextTutorialId: String? = nil // Last tutorial in the series
-    let completionMessage = "Exceptional work! You've mastered efficient harmonization protocols and are ready for advanced assignments."
+    let nextTutorialId: String? = "tutorial_patterns" // Last tutorial in the series
+    let completionMessage = "Exceptional work! You've mastered efficient harmonization protocols and are ready for the last basic training."
+}
+
+// MARK: - Patterns Tutorial Implementation
+struct PatternsTutorial: TutorialLevel {
+    let levelId = "tutorial_patterns"
+    let title = "NeutraTech Orientation #5"
+    let description = "Patterns in the field"
+    
+    var puzzleDefinition: PuzzleDefinition {
+        return PuzzleDefinition.patternsIdentificationPuzzle()
+    }
+    
+    let steps: [TutorialStep] = [
+        TutorialStep(
+            id: "patterns_intro",
+            instruction: "The more time you spend in the field, the faster you'll begin to recognize the classic energy harmonization patterns.",
+            requiresAction: false
+        ),
+        TutorialStep(
+            id: "patterns_warning",
+            instruction: "Noticing these patterns quickly can mean the difference between a routine assignment and a harmonization breach.",
+            requiresAction: false,
+        ),
+        TutorialStep(
+            id: "view_patterns",
+            instruction: "We've configured this containment chamber to show you a few of the most common patterns in the field.",
+            requiresAction: false,
+            highlightTargets: [.grid]
+        ),
+        TutorialStep(
+            id: "three_one",
+            instruction: "We call this the 3-1-1. A target cell of 3 with extended harmonization range cells of 1 in cardinal directions",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 0, col: 0), .cell(row: 0, col: 2), .cell(row: 2, col: 0)],
+        ),
+        TutorialStep(
+            id: "two_flower",
+            instruction: "This is the 2-Flower. It has harmonization range cells of 2 in all directions",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 1, col: 2), .cell(row: 1, col: 4), .cell(row: 0, col: 3), .cell(row: 2, col: 3)],
+        ),
+        TutorialStep(
+            id: "countdown",
+            instruction: "Last but not least, this is the Countdown. Just your standard 3-2-1 extended harmonization range in a single direction.",
+            requiresAction: false,
+            highlightTargets: [.cell(row: 4, col: 1), .cell(row: 4, col: 2), .cell(row: 4, col: 3)],
+        ),
+        TutorialStep(
+            id: "complete_task",
+            instruction: "Commit these to memory, and complete the puzzle by matching all target values.",
+            requiresAction: true,
+            validation: .puzzleSolved
+        )
+    ]
+    
+    let nextTutorialId: String? = nil
+    let completionMessage = "Great job! You've completed your training."
 }
 
 // MARK: - Tutorial Campaign Manager
@@ -347,11 +394,13 @@ class TutorialCampaign {
         let advancedTutorial = AdvancedTutorial()
         let correctionTutorial = CorrectionTutorial()
         let efficiencyTutorial = EfficiencyTutorial()
+        let patternsTutorial = PatternsTutorial()
         
         tutorials[basicTutorial.levelId] = basicTutorial
         tutorials[advancedTutorial.levelId] = advancedTutorial
         tutorials[correctionTutorial.levelId] = correctionTutorial
         tutorials[efficiencyTutorial.levelId] = efficiencyTutorial
+        tutorials[patternsTutorial.levelId] = patternsTutorial
     }
     
     func loadTutorial(_ id: String) -> TutorialLevel? {

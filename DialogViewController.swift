@@ -278,6 +278,8 @@ class DialogDataProvider {
     
     func getDialogs(for assignmentId: String) -> [DialogMessage] {
         switch assignmentId {
+        case "system_welcome":
+            return getSystemWelcomeDialogs()
         case "tutorial_basics":
             return tutorialDialogs
         case "tutorial_advanced":
@@ -291,6 +293,31 @@ class DialogDataProvider {
         default:
             return defaultDialogs
         }
+    }
+    
+    private func getSystemWelcomeDialogs() -> [DialogMessage] {
+        return [
+            DialogMessage(
+                speaker: "System",
+                text: "Welcome to NeutraTech Industries. Initializing employee workstation..."
+            ),
+            DialogMessage(
+                speaker: "System",
+                text: "Employee ID: NT-7842 confirmed. Clearance Level: 1. Department: Field Operations."
+            ),
+            DialogMessage(
+                speaker: "System",
+                text: "This dashboard provides access to company communications, training programs, and work assignments."
+            ),
+            DialogMessage(
+                speaker: "System",
+                text: "Please familiarize yourself with the interface. Additional features will be unlocked as you progress."
+            ),
+            DialogMessage(
+                speaker: "System",
+                text: "Welcome to the team. NeutraTech appreciates your commitment to our mission."
+            )
+        ]
     }
     
     private let tutorialDialogs = [
